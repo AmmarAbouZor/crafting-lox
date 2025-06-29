@@ -1,0 +1,7 @@
+[package]
+name = "tree-walk-rs"
+version = "0.1.0"
+edition = "2024"
+description = "Implementation of a tree walk interpreter for LOX language ported from Java section in crafting interpreters book"
+
+[dependencies]
