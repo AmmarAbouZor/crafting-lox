@@ -5,3 +5,9 @@ edition = "2024"
 description = "Implementation of a tree walk interpreter for LOX language ported from Java section in crafting interpreters book"
 
 [dependencies]
+anyhow = "1"
+thiserror = "2"
+
+[[bin]]
+name = "rlox"
+path = "src/main.rs"
