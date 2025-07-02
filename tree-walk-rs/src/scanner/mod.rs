@@ -11,7 +11,11 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
-    error_counts: usize,
+}
+
+pub struct ScannResults {
+    pub tokens: Vec<Token>,
+    pub errors: Vec<ScannError>,
 }
 
 impl Scanner {
@@ -22,30 +26,26 @@ impl Scanner {
             start: 0,
             current: 0,
             line: 1,
-            error_counts: 0,
         }
     }
 
-    pub fn scan_tokens(&mut self) -> &[Token] {
+    pub fn scan_tokens(mut self) -> ScannResults {
+        let mut errors = Vec::new();
         while !self.is_at_end() {
             // We are at the beginning of the next lexeme.
             self.start = self.current;
             match self.scan_intern() {
                 Ok(()) => {}
-                Err(err) => {
-                    self.error_counts += 1;
-                    eprintln!("{err}");
-                }
+                Err(err) => errors.push(err),
             };
         }
 
         self.tokens.push(Token::new(TT::Eof, "", self.line));
 
-        self.tokens.as_slice()
-    }
-
-    pub fn error_counts(&self) -> usize {
-        self.error_counts
+        ScannResults {
+            tokens: self.tokens,
+            errors,
+        }
     }
 
     fn scan_intern(&mut self) -> Result<(), ScannError> {

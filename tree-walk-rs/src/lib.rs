@@ -46,17 +46,24 @@ pub fn run_prompt() -> anyhow::Result<()> {
 }
 
 fn run(content: String) -> Result<(), RunError> {
-    let mut scanner = Scanner::new(content);
-    let tokens = scanner.scan_tokens();
+    let scanner = Scanner::new(content);
+    let scan_res = scanner.scan_tokens();
 
-    for token in tokens {
-        println!("{token}");
+    println!("Tokens:");
+    for token in scan_res.tokens {
+        println!("  {token}");
     }
 
-    let errors = scanner.error_counts();
+    let errors_count = scan_res.errors.len();
 
-    if errors > 0 {
-        Err(RunError::Scann(errors))
+    if errors_count > 0 {
+        println!("-------------------------------------------");
+        println!("Errors: ");
+        for err in scan_res.errors {
+            eprintln!("  {err}");
+        }
+        println!("-------------------------------------------");
+        Err(RunError::Scann(errors_count))
     } else {
         Ok(())
     }
