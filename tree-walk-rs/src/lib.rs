@@ -21,7 +21,7 @@ pub fn run_prompt() -> anyhow::Result<()> {
     let mut content = String::new();
     loop {
         content.clear();
-        print!("> ");
+        print!(">>> ");
 
         std::io::stdout()
             .flush()
