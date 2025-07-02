@@ -40,18 +40,24 @@ pub fn run_prompt() -> anyhow::Result<()> {
             Ok(()) => {}
             Err(RunError::Unrecoverable(err)) => return Err(err),
             // Don't stop on Scanning errors
-            Err(RunError::ScannError(err)) => eprintln!("{err}"),
+            Err(err @ RunError::Scann(_)) => eprintln!("{err}"),
         }
     }
 }
 
 fn run(content: String) -> Result<(), RunError> {
     let mut scanner = Scanner::new(content);
-    let tokens = scanner.scan_tokens()?;
+    let tokens = scanner.scan_tokens();
 
     for token in tokens {
         println!("{token}");
     }
 
-    Ok(())
+    let errors = scanner.error_counts();
+
+    if errors > 0 {
+        Err(RunError::Scann(errors))
+    } else {
+        Ok(())
+    }
 }

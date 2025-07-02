@@ -9,8 +9,12 @@ pub struct ScannError {
 }
 
 impl ScannError {
-    pub fn new(line: usize, message: String, pos: Option<usize>) -> Self {
-        Self { line, message, pos }
+    pub fn new(line: usize, message: impl Into<String>, pos: Option<usize>) -> Self {
+        Self {
+            line,
+            message: message.into(),
+            pos,
+        }
     }
 }
 
