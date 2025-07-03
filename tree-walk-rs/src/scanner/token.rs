@@ -60,9 +60,9 @@ impl Display for TokenType {
 
 #[derive(Debug, Clone)]
 pub struct Token {
-    typ: TokenType,
-    lexeme: String,
-    line: usize,
+    pub typ: TokenType,
+    pub lexeme: String,
+    pub line: usize,
 }
 
 impl Token {

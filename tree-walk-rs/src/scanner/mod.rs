@@ -4,7 +4,10 @@ mod token;
 
 pub use error::ScanError;
 use keyword::get_keywords;
-use token::{Token, TokenType as TT};
+
+pub use token::{Token, TokenType};
+
+use TokenType as TT;
 
 pub struct Scanner {
     source: String,

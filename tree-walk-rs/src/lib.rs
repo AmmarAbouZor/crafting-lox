@@ -3,8 +3,11 @@ use errors::RunError;
 use scanner::Scanner;
 use std::{io::Write, path::Path};
 
+mod ast;
 mod errors;
 mod scanner;
+
+pub use scanner::{Token, TokenType};
 
 pub fn run_file(path: &Path) -> anyhow::Result<()> {
     let file_content = std::fs::read_to_string(&path)
