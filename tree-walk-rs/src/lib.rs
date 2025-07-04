@@ -1,14 +1,18 @@
 use anyhow::Context;
 use errors::RunError;
+use interpreter::Interpreter;
 use parser::Parser;
 use scanner::Scanner;
 use std::{io::Write, path::Path};
 
 mod ast;
 mod errors;
+mod interpreter;
 mod parser;
 mod scanner;
 
+pub use interpreter::error::RuntimeError;
+pub use parser::error::ParseError;
 pub use scanner::{Token, TokenType};
 
 pub fn run_file(path: &Path) -> anyhow::Result<()> {
@@ -44,8 +48,10 @@ pub fn run_prompt() -> anyhow::Result<()> {
         match run(content.clone()) {
             Ok(()) => {}
             Err(RunError::Unrecoverable(err)) => return Err(err),
-            // Don't stop on Scanning errors
-            Err(err @ RunError::Scann(_)) => eprintln!("{err}"),
+            // Don't stop on other errors
+            Err(err @ RunError::Scan(_)) => eprintln!("Scan Error:\n{err}"),
+            Err(RunError::Parse(err)) => eprintln!("Parse Error:\n{err}"),
+            Err(RunError::Runtime(err)) => eprintln!("Runtime Error:\n{err}"),
         }
     }
 }
@@ -69,16 +75,21 @@ fn run(content: String) -> Result<(), RunError> {
             eprintln!("  {err}");
         }
         println!("-------------------------------------------");
-        return Err(RunError::Scann(errors_count));
+        return Err(RunError::Scan(errors_count));
     }
 
     let mut parser = Parser::new(scan_res.tokens);
 
+    let expr = parser.parse()?;
     println!("Parse Results:");
-    match parser.parse() {
-        Ok(expr) => println!("{}", expr.print()),
-        Err(err) => eprintln!("{err}"),
-    }
+    println!("  {}", expr.print());
+    println!("-------------------------------------------");
+
+    let mut interpreter = Interpreter {};
+
+    let value = interpreter.interpret(&expr)?;
+    println!("Evaluation:");
+    println!("{value}");
 
     Ok(())
 }

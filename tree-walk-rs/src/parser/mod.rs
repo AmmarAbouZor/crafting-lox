@@ -7,7 +7,7 @@ use crate::{
 
 type Result<T> = std::result::Result<T, error::ParseError>;
 
-mod error;
+pub mod error;
 
 #[derive(Debug)]
 pub struct Parser {
