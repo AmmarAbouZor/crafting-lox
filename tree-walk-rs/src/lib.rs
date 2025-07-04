@@ -5,6 +5,7 @@ use std::{io::Write, path::Path};
 
 mod ast;
 mod errors;
+mod parser;
 mod scanner;
 
 pub use scanner::{Token, TokenType};
