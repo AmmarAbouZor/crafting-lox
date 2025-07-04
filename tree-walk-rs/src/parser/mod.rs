@@ -1,9 +1,13 @@
-use anyhow::{Result, bail};
+use error::ParseError;
 
 use crate::{
     Token, TokenType as TT,
     ast::{Expr, LiteralValue},
 };
+
+type Result<T> = std::result::Result<T, error::ParseError>;
+
+mod error;
 
 #[derive(Debug)]
 pub struct Parser {
@@ -14,6 +18,10 @@ pub struct Parser {
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self { tokens, current: 0 }
+    }
+
+    pub fn parse(&mut self) -> Result<Expr> {
+        self.expression()
     }
 
     /// Definition: `expression → equality;`
@@ -123,7 +131,7 @@ impl Parser {
     }
 
     /// Definition:
-    /// ```
+    /// ```text
     /// unary  → ( "!" | "-" ) unary
     ///        | primary ;
     /// ```
@@ -143,12 +151,12 @@ impl Parser {
     }
 
     /// Definition:
-    /// ```
+    /// ```text
     /// primary  → NUMBER | STRING | "true" | "false" | "nil"
     ///          | "(" expression ")" ;
     /// ```
     pub fn primary(&mut self) -> Result<Expr> {
-        let expr = match &self.advance().typ {
+        let expr = match self.advance().typ.to_owned() {
             TT::False => Expr::Literal {
                 value: LiteralValue::Boolean(false),
             },
@@ -159,10 +167,10 @@ impl Parser {
                 value: LiteralValue::Nil,
             },
             TT::String(text) => Expr::Literal {
-                value: LiteralValue::Text(text.to_owned()),
+                value: LiteralValue::Text(text),
             },
             TT::Number(num) => Expr::Literal {
-                value: LiteralValue::Number(*num),
+                value: LiteralValue::Number(num),
             },
             TT::LeftParen => {
                 let expr = self.expression()?;
@@ -171,13 +179,45 @@ impl Parser {
                     expression: Box::new(expr),
                 }
             }
-            // TODO: Make the error here is correct.
-            unexpected => bail!("Unexpected Token in primary clause: {unexpected:?}"),
+            unexpected => {
+                return Err(ParseError::new(
+                    self.peek().to_owned(),
+                    format!("Expect expression, found {unexpected:?}"),
+                ));
+            }
         };
         Ok(expr)
     }
 
-    fn consume(&mut self, tt: &TT, error_msg: &str) -> Result<Token> {
-        todo!()
+    fn consume(&mut self, tt: &TT, error_msg: impl Into<String>) -> Result<&Token> {
+        if self.check(&tt) {
+            Ok(self.advance())
+        } else {
+            Err(ParseError::new(self.peek().to_owned(), error_msg.into()))
+        }
+    }
+
+    fn synchronize(&mut self) {
+        self.current += 1;
+        while !self.at_end() {
+            if self.previous().typ == TT::SemiColon {
+                return;
+            }
+            if matches!(
+                self.peek().typ,
+                TT::Class
+                    | TT::Fun
+                    | TT::Var
+                    | TT::For
+                    | TT::If
+                    | TT::While
+                    | TT::Print
+                    | TT::Return
+            ) {
+                return;
+            }
+
+            self.current += 1;
+        }
     }
 }

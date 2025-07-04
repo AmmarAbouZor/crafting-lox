@@ -1,5 +1,7 @@
 use std::{error::Error, fmt::Display};
 
+use crate::errors::format_err;
+
 /// Error while scanning code.
 #[derive(Debug)]
 pub struct ScanError {
@@ -20,12 +22,14 @@ impl ScanError {
 
 impl Display for ScanError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
+        format_err(
             f,
-            "[line {line}] Error{pos}: {message}",
-            line = self.line,
-            message = self.message,
-            pos = self.pos.map(|pos| format!(" {pos}")).unwrap_or_default()
+            self.line,
+            self.pos
+                .map(|pos| format!(" {pos}"))
+                .unwrap_or_default()
+                .as_str(),
+            &self.message,
         )
     }
 }

@@ -8,3 +8,9 @@ pub enum RunError {
     #[error("Scanning failed with {0} errors")]
     Scann(usize),
 }
+
+use std::fmt::{Formatter, Result};
+
+pub fn format_err(f: &mut Formatter<'_>, line: usize, position: &str, message: &str) -> Result {
+    write!(f, "[line {line}] Error{position}: {message}",)
+}

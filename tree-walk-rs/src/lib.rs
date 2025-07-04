@@ -1,5 +1,6 @@
 use anyhow::Context;
 use errors::RunError;
+use parser::Parser;
 use scanner::Scanner;
 use std::{io::Write, path::Path};
 
@@ -54,21 +55,30 @@ fn run(content: String) -> Result<(), RunError> {
     let scan_res = scanner.scan_tokens();
 
     println!("Tokens:");
-    for token in scan_res.tokens {
+    for token in &scan_res.tokens {
         println!("  {token}");
     }
+
+    println!("-------------------------------------------");
 
     let errors_count = scan_res.errors.len();
 
     if errors_count > 0 {
-        println!("-------------------------------------------");
         println!("Errors: ");
         for err in scan_res.errors {
             eprintln!("  {err}");
         }
         println!("-------------------------------------------");
-        Err(RunError::Scann(errors_count))
-    } else {
-        Ok(())
+        return Err(RunError::Scann(errors_count));
     }
+
+    let mut parser = Parser::new(scan_res.tokens);
+
+    println!("Parse Results:");
+    match parser.parse() {
+        Ok(expr) => println!("{}", expr.print()),
+        Err(err) => eprintln!("{err}"),
+    }
+
+    Ok(())
 }
