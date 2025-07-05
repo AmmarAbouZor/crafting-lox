@@ -121,7 +121,7 @@ impl Scanner {
                 // Ignore white spaces
             }
 
-            ch if ch.is_digit(10) => {
+            ch if ch.is_ascii_digit() => {
                 let token = self.parse_number();
                 self.add_token(token);
             }
@@ -210,15 +210,15 @@ impl Scanner {
     /// Parse number until the end advancing the current
     /// index to it.
     fn parse_number(&mut self) -> TT {
-        while self.peek().is_digit(10) {
+        while self.peek().is_ascii_digit() {
             self.current += 1;
         }
 
-        if self.peek() == '.' && self.peek_next().is_digit(10) {
+        if self.peek() == '.' && self.peek_next().is_ascii_digit() {
             // Consume the dot
             self.current += 1;
 
-            while self.peek().is_digit(10) {
+            while self.peek().is_ascii_digit() {
                 self.current += 1;
             }
         }
@@ -250,5 +250,5 @@ fn is_alpha(ch: char) -> bool {
 
 /// Check if char is alphabetic, underscore or numeric.
 fn is_alpha_numeric(ch: char) -> bool {
-    is_alpha(ch) || ch.is_digit(10)
+    is_alpha(ch) || ch.is_ascii_digit()
 }

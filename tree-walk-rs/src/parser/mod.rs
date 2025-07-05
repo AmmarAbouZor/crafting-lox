@@ -190,7 +190,7 @@ impl Parser {
     }
 
     fn consume(&mut self, tt: &TT, error_msg: impl Into<String>) -> Result<&Token> {
-        if self.check(&tt) {
+        if self.check(tt) {
             Ok(self.advance())
         } else {
             Err(ParseError::new(self.peek().to_owned(), error_msg.into()))

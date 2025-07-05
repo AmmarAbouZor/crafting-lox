@@ -54,7 +54,8 @@ pub enum TokenType {
 impl Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //TODO: Match token types. For now print their debug representation
-        write!(f, "{:?}", self)
+        // Or remove the pretty display implementation.
+        write!(f, "{self:?}")
     }
 }
 

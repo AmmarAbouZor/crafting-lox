@@ -16,7 +16,7 @@ pub use parser::error::ParseError;
 pub use scanner::{Token, TokenType};
 
 pub fn run_file(path: &Path) -> anyhow::Result<()> {
-    let file_content = std::fs::read_to_string(&path)
+    let file_content = std::fs::read_to_string(path)
         .with_context(|| format!("Error while reading input file. Path: {}", path.display()))?;
 
     run(file_content)?;
