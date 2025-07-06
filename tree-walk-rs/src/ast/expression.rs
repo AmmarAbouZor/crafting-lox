@@ -27,6 +27,10 @@ pub enum Expr {
     Variable {
         name: Token,
     },
+    Assign {
+        name: Token,
+        expression: Box<Expr>,
+    },
 }
 
 impl Expr {
@@ -54,6 +58,7 @@ impl Expr {
             Expr::Literal { value } => value.to_string(),
             Expr::Unary { operator, right } => parenthesize(&operator.lexeme, &[right]),
             Expr::Variable { name } => format!("Variable: {name}"),
+            Expr::Assign { name, expression } => parenthesize("assign", &[expression]),
         }
     }
 }

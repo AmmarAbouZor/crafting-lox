@@ -99,9 +99,37 @@ impl Parser {
         Ok(stmt)
     }
 
-    /// Definition: `expression → equality;`
+    /// Definition: `expression → assignment;`
     pub fn expression(&mut self) -> Result<Expr> {
-        self.equality()
+        self.assignment()
+    }
+
+    /// Definition:
+    /// ```text
+    /// assignment → IDENTIFIER "=" assignment
+    ///            | equality ;
+    /// ```
+    fn assignment(&mut self) -> Result<Expr> {
+        // L-Value
+        let expr = self.equality()?;
+        if self.match_then_consume(&[TT::Equal]) {
+            // R-Value
+            let value = self.assignment()?;
+            match expr {
+                Expr::Variable { name } => {
+                    return Ok(Expr::Assign {
+                        name,
+                        expression: Box::new(value),
+                    });
+                }
+                _ => {
+                    let equals = self.previous().to_owned();
+                    return Err(ParseError::new(equals, "Invalid assignment target."));
+                }
+            }
+        }
+
+        Ok(expr)
     }
 
     /// Definition: `equality → comparison ( ( "!=" | "==" ) comparison )* ;`

@@ -65,6 +65,11 @@ impl Interpreter {
                 right,
             } => self.evaluate_binary(left, operator, right),
             Expr::Variable { name } => self.environment.get(name).map(|val| val.to_owned()),
+            Expr::Assign { name, expression } => {
+                let value = self.evaluate(expression)?;
+                self.environment.assign(name, value.clone())?;
+                Ok(value)
+            }
         }
     }
 

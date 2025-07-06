@@ -20,4 +20,17 @@ impl Environment {
             )
         })
     }
+
+    pub fn assign(&mut self, name: &Token, value: LoxValue) -> Result<(), RuntimeError> {
+        let old_val = self.values.get_mut(&name.lexeme).ok_or_else(|| {
+            RuntimeError::new(
+                name.to_owned(),
+                format!("Undefined variable '{}'.", name.lexeme),
+            )
+        })?;
+
+        *old_val = value;
+
+        Ok(())
+    }
 }
