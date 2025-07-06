@@ -9,8 +9,11 @@ pub struct ParseError {
 }
 
 impl ParseError {
-    pub fn new(token: Token, msg: String) -> Self {
-        Self { token, msg }
+    pub fn new(token: Token, msg: impl Into<String>) -> Self {
+        Self {
+            token,
+            msg: msg.into(),
+        }
     }
 }
 

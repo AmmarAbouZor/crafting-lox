@@ -2,7 +2,7 @@ use error::ParseError;
 
 use crate::{
     Token, TokenType as TT,
-    ast::{Expr, LiteralValue},
+    ast::{Expr, LiteralValue, Stmt},
 };
 
 type Result<T> = std::result::Result<T, error::ParseError>;
@@ -20,8 +20,83 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Result<Expr> {
-        self.expression()
+    pub fn parse(&mut self) -> Result<Vec<Stmt>> {
+        let mut stmts = Vec::new();
+        while !self.at_end() {
+            if let Some(stmt) = self.declaration() {
+                stmts.push(stmt)
+            }
+        }
+
+        Ok(stmts)
+    }
+
+    fn declaration(&mut self) -> Option<Stmt> {
+        let res = if self.match_then_consume(&[TT::Var]) {
+            self.var_declaration()
+        } else {
+            self.statement()
+        };
+
+        //TODO: Error handling here instead of parse function doesn't feel right.
+        //However, I'll keep it here to stay in synch with the book for now.
+        match res {
+            Ok(stmt) => Some(stmt),
+            Err(err) => {
+                eprintln!("{err}");
+                self.synchronize();
+                None
+            }
+        }
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt> {
+        let name = if matches!(self.peek().typ, TT::Identifier(..)) {
+            self.advance().to_owned()
+        } else {
+            return Err(ParseError::new(
+                self.peek().to_owned(),
+                "Expect variable name",
+            ));
+        };
+
+        let initializer = if self.match_then_consume(&[TT::Equal]) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+
+        self.consume(&TT::SemiColon, "Expect ';' after variable declaration.")?;
+
+        let stmt = Stmt::Var { name, initializer };
+
+        Ok(stmt)
+    }
+
+    fn statement(&mut self) -> Result<Stmt> {
+        if self.match_then_consume(&[TT::Print]) {
+            return self.print_statement();
+        }
+
+        self.expr_statement()
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt> {
+        let expr = self.expression()?;
+        self.consume(&TT::SemiColon, "Expect ';' after value.")?;
+
+        let stmt = Stmt::Print(expr);
+
+        Ok(stmt)
+    }
+
+    fn expr_statement(&mut self) -> Result<Stmt> {
+        let expr = self.expression()?;
+        self.consume(&TT::SemiColon, "Expect ';' after expression.")?;
+
+        let stmt = Stmt::Expression(expr);
+
+        Ok(stmt)
     }
 
     /// Definition: `expression → equality;`
@@ -48,7 +123,7 @@ impl Parser {
     /// Check if any matches then it consumes the current token.
     fn match_then_consume(&mut self, tts: &[TT]) -> bool {
         if tts.iter().any(|tt| self.check(tt)) {
-            self.current += 1;
+            self.advance();
             true
         } else {
             false
@@ -156,7 +231,8 @@ impl Parser {
     ///          | "(" expression ")" ;
     /// ```
     pub fn primary(&mut self) -> Result<Expr> {
-        let expr = match self.advance().typ.to_owned() {
+        let token = self.advance();
+        let expr = match token.typ.to_owned() {
             TT::False => Expr::Literal {
                 value: LiteralValue::Boolean(false),
             },
@@ -179,6 +255,9 @@ impl Parser {
                     expression: Box::new(expr),
                 }
             }
+            TT::Identifier(..) => Expr::Variable {
+                name: token.to_owned(),
+            },
             unexpected => {
                 return Err(ParseError::new(
                     self.peek().to_owned(),
@@ -198,7 +277,7 @@ impl Parser {
     }
 
     fn synchronize(&mut self) {
-        self.current += 1;
+        self.advance();
         while !self.at_end() {
             if self.previous().typ == TT::SemiColon {
                 return;
@@ -217,7 +296,7 @@ impl Parser {
                 return;
             }
 
-            self.current += 1;
+            self.advance();
         }
     }
 }

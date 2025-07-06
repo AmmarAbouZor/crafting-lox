@@ -1,33 +1,75 @@
 use error::RuntimeError;
-use values::LoxValue;
 
-use crate::{Token, TokenType as TT, ast::Expr};
+use crate::{
+    Token, TokenType as TT,
+    ast::{Expr, Stmt},
+};
 
+mod environment;
 pub mod error;
 mod values;
 
-pub struct Interpreter {}
+use environment::Environment;
+pub use values::LoxValue;
+
+type Result<T> = std::result::Result<T, RuntimeError>;
+
+#[derive(Debug, Default)]
+pub struct Interpreter {
+    environment: Environment,
+}
 
 impl Interpreter {
-    pub fn interpret(&mut self, expr: &Expr) -> Result<LoxValue, RuntimeError> {
-        Self::evaluate(expr)
+    pub fn interpret(&mut self, stmts: &[Stmt]) {
+        for stmt in stmts {
+            match self.execute(stmt) {
+                Ok(()) => {}
+                Err(err) => eprintln!("{err}"),
+            }
+        }
     }
 
-    fn evaluate(expr: &Expr) -> Result<LoxValue, RuntimeError> {
+    fn execute(&mut self, stmt: &Stmt) -> Result<()> {
+        match stmt {
+            Stmt::Expression(expr) => {
+                // Expression on their own doesn't need the evaluated
+                // value from expression. Examples `1 + 2;` `true;`
+                let _ = self.evaluate(expr)?;
+            }
+            Stmt::Print(expr) => {
+                let val = self.evaluate(expr)?;
+                println!("{val}");
+            }
+            Stmt::Var { name, initializer } => {
+                let val = if let Some(expr) = initializer {
+                    self.evaluate(expr)?
+                } else {
+                    LoxValue::Nil
+                };
+
+                self.environment.define(name.lexeme.to_owned(), val);
+            }
+        };
+
+        Ok(())
+    }
+
+    fn evaluate(&mut self, expr: &Expr) -> Result<LoxValue> {
         match expr {
-            Expr::Grouping { expression } => Self::evaluate(expression),
+            Expr::Grouping { expression } => self.evaluate(expression),
             Expr::Literal { value } => Ok(value.into()),
-            Expr::Unary { operator, right } => Self::evaluate_unary(operator, right),
+            Expr::Unary { operator, right } => self.evaluate_unary(operator, right),
             Expr::Binary {
                 left,
                 operator,
                 right,
-            } => Self::evaluate_binary(left, operator, right),
+            } => self.evaluate_binary(left, operator, right),
+            Expr::Variable { name } => self.environment.get(name).map(|val| val.to_owned()),
         }
     }
 
-    fn evaluate_unary(operator: &Token, right: &Expr) -> Result<LoxValue, RuntimeError> {
-        let right = Self::evaluate(right)?;
+    fn evaluate_unary(&mut self, operator: &Token, right: &Expr) -> Result<LoxValue> {
+        let right = self.evaluate(right)?;
         let value = match (right, &operator.typ) {
             // Minus
             (LoxValue::Number(num), TT::Minus) => LoxValue::Number(-num),
@@ -48,14 +90,10 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn evaluate_binary(
-        left: &Expr,
-        operator: &Token,
-        right: &Expr,
-    ) -> Result<LoxValue, RuntimeError> {
+    fn evaluate_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> Result<LoxValue> {
         use LoxValue as V;
-        let left = Self::evaluate(left)?;
-        let right = Self::evaluate(right)?;
+        let left = self.evaluate(left)?;
+        let right = self.evaluate(right)?;
 
         let value = match (left, &operator.typ, right) {
             // Arithmetics

@@ -11,7 +11,7 @@ mod interpreter;
 mod parser;
 mod scanner;
 
-pub use interpreter::error::RuntimeError;
+pub use interpreter::{LoxValue, error::RuntimeError};
 pub use parser::error::ParseError;
 pub use scanner::{Token, TokenType};
 
@@ -60,12 +60,12 @@ fn run(content: String) -> Result<(), RunError> {
     let scanner = Scanner::new(content);
     let scan_res = scanner.scan_tokens();
 
-    println!("Tokens:");
-    for token in &scan_res.tokens {
-        println!("  {token}");
-    }
-
-    println!("-------------------------------------------");
+    //TODO: Clean up
+    // println!("Tokens:");
+    // for token in &scan_res.tokens {
+    //     println!("  {token}");
+    // }
+    // println!("-------------------------------------------");
 
     let errors_count = scan_res.errors.len();
 
@@ -80,16 +80,11 @@ fn run(content: String) -> Result<(), RunError> {
 
     let mut parser = Parser::new(scan_res.tokens);
 
-    let expr = parser.parse()?;
-    println!("Parse Results:");
-    println!("  {}", expr.print());
-    println!("-------------------------------------------");
+    let stmts = parser.parse()?;
 
-    let mut interpreter = Interpreter {};
+    let mut interpreter = Interpreter::default();
 
-    let value = interpreter.interpret(&expr)?;
-    println!("Evaluation:");
-    println!("{value}");
+    interpreter.interpret(&stmts);
 
     Ok(())
 }
