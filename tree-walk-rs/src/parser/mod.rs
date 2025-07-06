@@ -73,12 +73,38 @@ impl Parser {
         Ok(stmt)
     }
 
+    /// Definition:
+    /// ```text
+    /// statement → exprStmt
+    ///           | printStmt
+    ///           | block ;
+    /// ```
     fn statement(&mut self) -> Result<Stmt> {
         if self.match_then_consume(&[TT::Print]) {
             return self.print_statement();
         }
 
+        if self.match_then_consume(&[TT::LeftBrace]) {
+            let statements = self.block()?;
+            return Ok(Stmt::Block { statements });
+        }
+
         self.expr_statement()
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>> {
+        let mut stmts = Vec::new();
+        while !self.check(&TT::RightBrace) && !self.at_end() {
+            // TODO: Error handling doesn't feel correct here.
+            // I need to reconsider when book part is done.
+            if let Some(stmt) = self.declaration() {
+                stmts.push(stmt);
+            }
+        }
+
+        self.consume(&TT::RightBrace, "Expect '}' after block.")?;
+
+        Ok(stmts)
     }
 
     fn print_statement(&mut self) -> Result<Stmt> {

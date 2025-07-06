@@ -9,14 +9,14 @@ mod environment;
 pub mod error;
 mod values;
 
-use environment::Environment;
+use environment::{Environment, EnvironmentRef};
 pub use values::LoxValue;
 
 type Result<T> = std::result::Result<T, RuntimeError>;
 
 #[derive(Debug, Default)]
 pub struct Interpreter {
-    environment: Environment,
+    environment: EnvironmentRef,
 }
 
 impl Interpreter {
@@ -47,9 +47,32 @@ impl Interpreter {
                     LoxValue::Nil
                 };
 
-                self.environment.define(name.lexeme.to_owned(), val);
+                self.environment
+                    .borrow_mut()
+                    .define(name.lexeme.to_owned(), val);
+            }
+            Stmt::Block { statements } => {
+                let env = Environment::with_enclosing(self.environment.clone());
+                self.execute_block(statements, env)?;
             }
         };
+
+        Ok(())
+    }
+
+    fn execute_block(&mut self, statements: &[Stmt], environment: EnvironmentRef) -> Result<()> {
+        let prev_env = self.environment.clone();
+
+        self.environment = environment;
+
+        for stmt in statements {
+            if let Err(err) = self.execute(stmt) {
+                self.environment = prev_env;
+                return Err(err);
+            }
+        }
+
+        self.environment = prev_env;
 
         Ok(())
     }
@@ -64,10 +87,14 @@ impl Interpreter {
                 operator,
                 right,
             } => self.evaluate_binary(left, operator, right),
-            Expr::Variable { name } => self.environment.get(name).map(|val| val.to_owned()),
+            Expr::Variable { name } => self
+                .environment
+                .borrow()
+                .get(name)
+                .map(|val| val.to_owned()),
             Expr::Assign { name, expression } => {
                 let value = self.evaluate(expression)?;
-                self.environment.assign(name, value.clone())?;
+                self.environment.borrow_mut().assign(name, value.clone())?;
                 Ok(value)
             }
         }
