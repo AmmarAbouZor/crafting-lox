@@ -20,6 +20,11 @@ pub enum Expr {
     Literal {
         value: LiteralValue,
     },
+    Logical {
+        left: Box<Expr>,
+        operator: Token,
+        right: Box<Expr>,
+    },
     Unary {
         operator: Token,
         right: Box<Expr>,
@@ -59,6 +64,11 @@ impl Expr {
             Expr::Unary { operator, right } => parenthesize(&operator.lexeme, &[right]),
             Expr::Variable { name } => format!("Variable: {name}"),
             Expr::Assign { name, expression } => parenthesize("assign", &[expression]),
+            Expr::Logical {
+                left,
+                operator,
+                right,
+            } => parenthesize(&operator.lexeme, &[left, right]),
         }
     }
 }

@@ -55,6 +55,18 @@ impl Interpreter {
                 let env = Environment::with_enclosing(self.environment.clone());
                 self.execute_block(statements, env)?;
             }
+            Stmt::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                let cond_val = self.evaluate(condition)?;
+                if cond_val.is_truthy() {
+                    self.execute(then_branch)?;
+                } else if let Some(else_branch) = else_branch {
+                    self.execute(else_branch)?;
+                }
+            }
         };
 
         Ok(())
@@ -97,6 +109,11 @@ impl Interpreter {
                 self.environment.borrow_mut().assign(name, value.clone())?;
                 Ok(value)
             }
+            Expr::Logical {
+                left,
+                operator,
+                right,
+            } => self.evaluate_logical(left, operator, right),
         }
     }
 
@@ -178,5 +195,32 @@ impl Interpreter {
         };
 
         Ok(value)
+    }
+
+    fn evaluate_logical(
+        &mut self,
+        left: &Expr,
+        operator: &Token,
+        right: &Expr,
+    ) -> Result<LoxValue> {
+        // Evaluate left first and only execute right if logical expand to it.
+        // This is necessary to avoid any side effect from executing right.
+
+        let left = self.evaluate(left)?;
+        match &operator.typ {
+            TT::Or => {
+                if left.is_truthy() {
+                    return Ok(left);
+                }
+            }
+            TT::And => {
+                if !left.is_truthy() {
+                    return Ok(left);
+                }
+            }
+            invalid => panic!("Invalid logical operator: {invalid:?}"),
+        }
+
+        self.evaluate(right)
     }
 }

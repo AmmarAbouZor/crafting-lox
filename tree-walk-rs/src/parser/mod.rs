@@ -76,10 +76,14 @@ impl Parser {
     /// Definition:
     /// ```text
     /// statement → exprStmt
+    ///           | ifStmt
     ///           | printStmt
     ///           | block ;
     /// ```
     fn statement(&mut self) -> Result<Stmt> {
+        if self.match_then_consume(&[TT::If]) {
+            return self.if_statement();
+        }
         if self.match_then_consume(&[TT::Print]) {
             return self.print_statement();
         }
@@ -90,6 +94,34 @@ impl Parser {
         }
 
         self.expr_statement()
+    }
+
+    /// Definition:
+    /// ```text
+    /// ifStmt  → "if" "(" expression ")" statement
+    ///         ( "else" statement )? ;
+    /// ```
+    fn if_statement(&mut self) -> Result<Stmt> {
+        self.consume(&TT::LeftParen, "Expect '(' after 'if'")?;
+        let condition = self.expression()?;
+        self.consume(&TT::RightParen, "Expect ')' after condition")?;
+
+        let then_stmt = self.statement()?;
+        let then_branch = Box::new(then_stmt);
+        let else_branch = if self.match_then_consume(&[TT::Else]) {
+            let else_stmt = self.statement()?;
+            Some(Box::new(else_stmt))
+        } else {
+            None
+        };
+
+        let stmt = Stmt::If {
+            condition,
+            then_branch,
+            else_branch,
+        };
+
+        Ok(stmt)
     }
 
     fn block(&mut self) -> Result<Vec<Stmt>> {
@@ -133,11 +165,11 @@ impl Parser {
     /// Definition:
     /// ```text
     /// assignment → IDENTIFIER "=" assignment
-    ///            | equality ;
+    ///            | logic_or ;
     /// ```
     fn assignment(&mut self) -> Result<Expr> {
         // L-Value
-        let expr = self.equality()?;
+        let expr = self.or()?;
         if self.match_then_consume(&[TT::Equal]) {
             // R-Value
             let value = self.assignment()?;
@@ -153,6 +185,46 @@ impl Parser {
                     return Err(ParseError::new(equals, "Invalid assignment target."));
                 }
             }
+        }
+
+        Ok(expr)
+    }
+
+    /// Definition
+    /// ```text
+    /// logic_or → logic_and ( "or" logic_and )* ;
+    /// ```
+    fn or(&mut self) -> Result<Expr> {
+        let mut expr = self.and()?;
+
+        while self.match_then_consume(&[TT::Or]) {
+            let operator = self.previous().to_owned();
+            let right = self.and()?;
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            };
+        }
+
+        Ok(expr)
+    }
+
+    /// Definition
+    /// ```text
+    /// logic_and → equality ( "and" equality )* ;
+    /// ```
+    fn and(&mut self) -> Result<Expr> {
+        let mut expr = self.equality()?;
+
+        while self.match_then_consume(&[TT::And]) {
+            let operator = self.previous().to_owned();
+            let right = self.equality()?;
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                operator,
+                right: Box::new(right),
+            };
         }
 
         Ok(expr)
