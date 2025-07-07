@@ -76,16 +76,25 @@ impl Parser {
     /// Definition:
     /// ```text
     /// statement → exprStmt
+    ///           | forStmt
     ///           | ifStmt
     ///           | printStmt
+    ///           | whileStmt
     ///           | block ;
     /// ```
     fn statement(&mut self) -> Result<Stmt> {
+        if self.match_then_consume(&[TT::For]) {
+            return self.for_statement();
+        }
         if self.match_then_consume(&[TT::If]) {
             return self.if_statement();
         }
         if self.match_then_consume(&[TT::Print]) {
             return self.print_statement();
+        }
+
+        if self.match_then_consume(&[TT::While]) {
+            return self.while_statement();
         }
 
         if self.match_then_consume(&[TT::LeftBrace]) {
@@ -124,6 +133,69 @@ impl Parser {
         Ok(stmt)
     }
 
+    /// Definition:
+    /// ```text
+    /// forStmt → "for" "(" ( varDecl | exprStmt | ";" )
+    ///           expression? ";"
+    ///           expression? ")" statement ;
+    /// ```
+    fn for_statement(&mut self) -> Result<Stmt> {
+        // NOTE:
+        // TWe will desugar the for loop into while loop
+        // To be honest: I don't like this solution. I would rather have a clear
+        // solution with definitions for easier maintainability.
+        // I would rather rewrite this as own statement with own execute function.
+
+        self.consume(&TT::LeftParen, "Expect '(' after for.")?;
+
+        let initializer = if self.match_then_consume(&[TT::SemiColon]) {
+            None
+        } else if self.match_then_consume(&[TT::Var]) {
+            Some(self.var_declaration()?)
+        } else {
+            Some(self.expr_statement()?)
+        };
+
+        let condition = if !self.check(&TT::SemiColon) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(&TT::SemiColon, "Expect ';' after loop condition")?;
+
+        let increment = if !self.check(&TT::RightParen) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(&TT::RightParen, "Expect ')' after for cluase.")?;
+
+        let mut body = self.statement()?;
+
+        if let Some(increment) = increment {
+            body = Stmt::Block {
+                statements: vec![body, Stmt::Expression(increment)],
+            };
+        }
+
+        let condition = condition.unwrap_or(Expr::Literal {
+            value: LiteralValue::Boolean(true),
+        });
+
+        body = Stmt::While {
+            condition,
+            body: Box::new(body),
+        };
+
+        if let Some(initializer) = initializer {
+            body = Stmt::Block {
+                statements: vec![initializer, body],
+            };
+        }
+
+        Ok(body)
+    }
+
     fn block(&mut self) -> Result<Vec<Stmt>> {
         let mut stmts = Vec::new();
         while !self.check(&TT::RightBrace) && !self.at_end() {
@@ -144,6 +216,24 @@ impl Parser {
         self.consume(&TT::SemiColon, "Expect ';' after value.")?;
 
         let stmt = Stmt::Print(expr);
+
+        Ok(stmt)
+    }
+
+    /// Definition:
+    /// ```text
+    /// whileStmt → "while" "(" expression ")" statement ;
+    /// ```
+    fn while_statement(&mut self) -> Result<Stmt> {
+        self.consume(&TT::LeftParen, "Expect '(' after while.")?;
+        let condition = self.expression()?;
+        self.consume(&TT::RightParen, "Expect ')' after condition.")?;
+        let body = self.statement()?;
+
+        let stmt = Stmt::While {
+            condition,
+            body: Box::new(body),
+        };
 
         Ok(stmt)
     }
