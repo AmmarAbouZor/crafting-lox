@@ -1,3 +1,6 @@
+use std::{cell::RefCell, rc::Rc};
+
+use callables::{CLOCK_NAME, LoxCallable};
 use error::RuntimeError;
 
 use crate::{
@@ -15,12 +18,24 @@ pub use values::LoxValue;
 
 type Result<T> = std::result::Result<T, RuntimeError>;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Interpreter {
+    globals: EnvironmentRef,
     environment: EnvironmentRef,
 }
 
 impl Interpreter {
+    pub fn new() -> Self {
+        let mut globals = Environment::default();
+        globals.define(CLOCK_NAME.into(), LoxValue::Callable(LoxCallable::Clock));
+        let globals = Rc::new(RefCell::new(globals));
+        let environment = globals.clone();
+
+        Self {
+            globals,
+            environment,
+        }
+    }
     pub fn interpret(&mut self, stmts: &[Stmt]) {
         for stmt in stmts {
             match self.execute(stmt) {
@@ -73,6 +88,7 @@ impl Interpreter {
                     self.execute(body)?;
                 }
             }
+            Stmt::Function { name, params, body } => todo!("Function not implemented"),
         };
 
         Ok(())

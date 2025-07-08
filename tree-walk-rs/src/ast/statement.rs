@@ -5,6 +5,11 @@ use super::Expr;
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Expression(Expr),
+    Function {
+        name: Token,
+        params: Vec<Token>,
+        body: Vec<Stmt>,
+    },
     If {
         condition: Expr,
         then_branch: Box<Stmt>,

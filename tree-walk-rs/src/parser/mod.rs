@@ -9,6 +9,8 @@ type Result<T> = std::result::Result<T, error::ParseError>;
 
 pub mod error;
 
+const MAX_ARGS_COUNT: usize = 255;
+
 #[derive(Debug)]
 pub struct Parser {
     tokens: Vec<Token>,
@@ -31,8 +33,16 @@ impl Parser {
         Ok(stmts)
     }
 
+    /// Definition:
+    /// ```text
+    /// declaration → funDecl
+    ///             | varDecl
+    ///             | statement ;
+    /// ```
     fn declaration(&mut self) -> Option<Stmt> {
-        let res = if self.match_then_consume(&[TT::Var]) {
+        let res = if self.match_then_consume(&[TT::Fun]) {
+            self.function_declaration("function")
+        } else if self.match_then_consume(&[TT::Var]) {
             self.var_declaration()
         } else {
             self.statement()
@@ -50,15 +60,55 @@ impl Parser {
         }
     }
 
+    /// Definition:
+    /// ```text
+    /// funDecl     → "fun" function ;
+    /// function    → IDENTIFIER "(" parameters? ")" block ;
+    /// parameters  → IDENTIFIER ( "," IDENTIFIER )* ;
+    /// ```
+    fn function_declaration(&mut self, kind: &str) -> Result<Stmt> {
+        // Name:
+        let name = self
+            .consume_identifier(format!("Expect {kind} name."))?
+            .to_owned();
+
+        self.consume(&TT::LeftParen, format!("Expect '(' after {kind} name."))?;
+
+        // Parameters
+        let mut params = Vec::new();
+
+        if !self.check(&TT::RightParen) {
+            loop {
+                if params.len() > MAX_ARGS_COUNT {
+                    return Err(ParseError::new(
+                        self.peek().to_owned(),
+                        format!("Can't have more than {MAX_ARGS_COUNT} arguments."),
+                    ));
+                }
+                let param = self
+                    .consume_identifier("Expect parameter name.")?
+                    .to_owned();
+                params.push(param);
+
+                if !self.match_then_consume(&[TT::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        self.consume(&TT::RightParen, "Expect ')' after parameters")?;
+
+        // Body:
+        self.consume(&TT::LeftBrace, format!("Expect '{{' before {kind} body."))?;
+        let body = self.block()?;
+
+        let stmt = Stmt::Function { name, params, body };
+
+        Ok(stmt)
+    }
+
     fn var_declaration(&mut self) -> Result<Stmt> {
-        let name = if matches!(self.peek().typ, TT::Identifier(..)) {
-            self.advance().to_owned()
-        } else {
-            return Err(ParseError::new(
-                self.peek().to_owned(),
-                "Expect variable name",
-            ));
-        };
+        let name = self.consume_identifier("Expect variable name")?.to_owned();
 
         let initializer = if self.match_then_consume(&[TT::Equal]) {
             Some(self.expression()?)
@@ -464,11 +514,11 @@ impl Parser {
         let mut arguments = Vec::new();
         if !self.check(&TT::RightParen) {
             loop {
-                if arguments.len() >= 255 {
+                if arguments.len() >= MAX_ARGS_COUNT {
                     let current_token = self.peek().to_owned();
                     return Err(ParseError::new(
                         current_token,
-                        "Can't have more than 255 arguments.",
+                        format!("Can't have more than {MAX_ARGS_COUNT} arguments."),
                     ));
                 }
 
@@ -541,6 +591,20 @@ impl Parser {
         } else {
             Err(ParseError::new(self.peek().to_owned(), error_msg.into()))
         }
+    }
+
+    // Same as consume function but with match because Identifier require
+    // checking for matching but not equality.
+    fn consume_identifier(&mut self, error_msg: impl Into<String>) -> Result<&Token> {
+        let peek = self.peek();
+        let ident = match &peek.typ {
+            TT::Identifier(..) => self.advance(),
+            _ => {
+                return Err(ParseError::new(peek.to_owned(), error_msg));
+            }
+        };
+
+        Ok(ident)
     }
 
     fn synchronize(&mut self) {

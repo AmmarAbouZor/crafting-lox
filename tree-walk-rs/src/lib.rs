@@ -82,7 +82,7 @@ fn run(content: String) -> Result<(), RunError> {
 
     let stmts = parser.parse()?;
 
-    let mut interpreter = Interpreter::default();
+    let mut interpreter = Interpreter::new();
 
     interpreter.interpret(&stmts);
 
