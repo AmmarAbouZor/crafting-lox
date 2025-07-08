@@ -14,6 +14,11 @@ pub enum Expr {
         operator: Token,
         right: Box<Expr>,
     },
+    Call {
+        callee: Box<Expr>,
+        paren: Token,
+        arguments: Vec<Expr>,
+    },
     Grouping {
         expression: Box<Expr>,
     },
@@ -69,6 +74,16 @@ impl Expr {
                 operator,
                 right,
             } => parenthesize(&operator.lexeme, &[left, right]),
+            Expr::Call {
+                callee,
+                paren,
+                arguments,
+            } => {
+                let exprs: Vec<_> = std::iter::once(callee.as_ref())
+                    .chain(arguments.iter())
+                    .collect();
+                parenthesize("function", &exprs)
+            }
         }
     }
 }

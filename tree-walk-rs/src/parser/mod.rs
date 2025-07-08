@@ -424,7 +424,7 @@ impl Parser {
     /// Definition:
     /// ```text
     /// unary  → ( "!" | "-" ) unary
-    ///        | primary ;
+    ///        | call ;
     /// ```
     pub fn unary(&mut self) -> Result<Expr> {
         if self.match_then_consume(&[TT::Bang, TT::Minus]) {
@@ -437,8 +437,59 @@ impl Parser {
 
             Ok(expr)
         } else {
-            self.primary()
+            self.call()
         }
+    }
+
+    /// Definition:
+    /// ```text
+    /// call      → primary ( "(" arguments? ")" )* ;
+    /// arguments → expression ( "," expression )* ;
+    /// ```
+    pub fn call(&mut self) -> Result<Expr> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.match_then_consume(&[TT::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr> {
+        let mut arguments = Vec::new();
+        if !self.check(&TT::RightParen) {
+            loop {
+                if arguments.len() >= 255 {
+                    let current_token = self.peek().to_owned();
+                    return Err(ParseError::new(
+                        current_token,
+                        "Can't have more than 255 arguments.",
+                    ));
+                }
+
+                arguments.push(self.expression()?);
+                if !self.match_then_consume(&[TT::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        let paren = self
+            .consume(&TT::RightParen, "Expect ')' after arguments.")?
+            .to_owned();
+
+        let expr = Expr::Call {
+            callee: Box::new(callee),
+            paren,
+            arguments,
+        };
+
+        Ok(expr)
     }
 
     /// Definition:

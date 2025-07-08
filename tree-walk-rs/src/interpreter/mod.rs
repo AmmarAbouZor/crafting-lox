@@ -5,6 +5,7 @@ use crate::{
     ast::{Expr, Stmt},
 };
 
+mod callables;
 mod environment;
 pub mod error;
 mod values;
@@ -119,7 +120,48 @@ impl Interpreter {
                 operator,
                 right,
             } => self.evaluate_logical(left, operator, right),
+            Expr::Call {
+                callee,
+                paren,
+                arguments,
+            } => self.evaluate_call(callee, paren, arguments),
         }
+    }
+
+    fn evaluate_call(
+        &mut self,
+        callee: &Expr,
+        paren: &Token,
+        arguments: &[Expr],
+    ) -> Result<LoxValue> {
+        let callee = self.evaluate(callee)?;
+        let mut args = Vec::with_capacity(arguments.len());
+        for arg in arguments {
+            args.push(self.evaluate(arg)?);
+        }
+
+        let callee = match callee {
+            LoxValue::Callable(lox_callable) => lox_callable,
+            _ => {
+                return Err(RuntimeError::new(
+                    paren.to_owned(),
+                    "Can only call functions and classes.",
+                ));
+            }
+        };
+
+        if callee.arity() != args.len() {
+            return Err(RuntimeError::new(
+                paren.to_owned(),
+                format!(
+                    "Expected {} arguments but got {}.",
+                    callee.arity(),
+                    args.len()
+                ),
+            ));
+        }
+
+        callee.call(self, &args)
     }
 
     fn evaluate_unary(&mut self, operator: &Token, right: &Expr) -> Result<LoxValue> {

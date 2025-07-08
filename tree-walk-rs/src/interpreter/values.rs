@@ -2,12 +2,15 @@ use std::fmt::Display;
 
 use crate::ast::LiteralValue;
 
+use super::callables::LoxCallable;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum LoxValue {
     Nil,
     Boolean(bool),
     Number(f64),
     String(String),
+    Callable(LoxCallable),
 }
 
 impl From<&LiteralValue> for LoxValue {
@@ -28,6 +31,7 @@ impl Display for LoxValue {
             LoxValue::Boolean(val) => write!(f, "{val}"),
             LoxValue::Number(val) => write!(f, "{val}"),
             LoxValue::String(val) => write!(f, "{val}"),
+            LoxValue::Callable(lox_callable) => write!(f, "{lox_callable}"),
         }
     }
 }
@@ -38,7 +42,7 @@ impl LoxValue {
         match self {
             LoxValue::Nil => false,
             LoxValue::Boolean(val) => *val,
-            LoxValue::Number(..) | LoxValue::String(..) => true,
+            LoxValue::Number(..) | LoxValue::String(..) | LoxValue::Callable(..) => true,
         }
     }
 }
