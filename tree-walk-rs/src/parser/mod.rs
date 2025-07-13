@@ -2,7 +2,7 @@ use error::ParseError;
 
 use crate::{
     Token, TokenType as TT,
-    ast::{Expr, LiteralValue, Stmt},
+    ast::{Expr, FuncDeclaration, LiteralValue, Stmt},
 };
 
 type Result<T> = std::result::Result<T, error::ParseError>;
@@ -82,7 +82,7 @@ impl Parser {
                 if params.len() > MAX_ARGS_COUNT {
                     return Err(ParseError::new(
                         self.peek().to_owned(),
-                        format!("Can't have more than {MAX_ARGS_COUNT} arguments."),
+                        format!("Can't have more than {MAX_ARGS_COUNT} parameters."),
                     ));
                 }
                 let param = self
@@ -102,7 +102,9 @@ impl Parser {
         self.consume(&TT::LeftBrace, format!("Expect '{{' before {kind} body."))?;
         let body = self.block()?;
 
-        let stmt = Stmt::Function { name, params, body };
+        let declaration = FuncDeclaration::new(name, params, body);
+
+        let stmt = Stmt::Function(declaration);
 
         Ok(stmt)
     }

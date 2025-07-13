@@ -4,9 +4,9 @@ mod statement;
 use std::fmt::Display;
 
 pub use expression::Expr;
-pub use statement::Stmt;
+pub use statement::{FuncDeclaration, Stmt};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LiteralValue {
     Nil,
     Boolean(bool),

@@ -7,7 +7,7 @@ use crate::Token;
 
 // NOTE: I ported the visitor pattern from the book into Rust pattern matching
 // on enums since this what they wanted to achieve.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Binary {
         left: Box<Expr>,

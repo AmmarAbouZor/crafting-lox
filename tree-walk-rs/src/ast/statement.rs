@@ -2,14 +2,10 @@ use crate::Token;
 
 use super::Expr;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Expression(Expr),
-    Function {
-        name: Token,
-        params: Vec<Token>,
-        body: Vec<Stmt>,
-    },
+    Function(FuncDeclaration),
     If {
         condition: Expr,
         then_branch: Box<Stmt>,
@@ -27,4 +23,19 @@ pub enum Stmt {
     Block {
         statements: Vec<Stmt>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+/// Wrapper around function declaration infos to avoid repeat them in
+/// both `Stmt` and `LoxCallable`
+pub struct FuncDeclaration {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: Vec<Stmt>,
+}
+
+impl FuncDeclaration {
+    pub fn new(name: Token, params: Vec<Token>, body: Vec<Stmt>) -> Self {
+        Self { name, params, body }
+    }
 }

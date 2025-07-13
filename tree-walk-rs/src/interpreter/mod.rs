@@ -88,7 +88,15 @@ impl Interpreter {
                     self.execute(body)?;
                 }
             }
-            Stmt::Function { name, params, body } => todo!("Function not implemented"),
+            Stmt::Function(declaration) => {
+                let function = LoxCallable::LoxFunction {
+                    declaration: declaration.to_owned(),
+                };
+                self.environment.borrow_mut().define(
+                    declaration.name.lexeme.to_owned(),
+                    LoxValue::Callable(function),
+                );
+            }
         };
 
         Ok(())
