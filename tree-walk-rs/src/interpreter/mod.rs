@@ -97,6 +97,18 @@ impl Interpreter {
                     LoxValue::Callable(function),
                 );
             }
+            Stmt::Return {
+                keyword: _,
+                value_expr,
+            } => {
+                let value = match value_expr {
+                    Some(expr) => self.evaluate(expr)?,
+                    None => LoxValue::Nil,
+                };
+
+                // Misuse of errors since they will bubble up the call stack
+                return Err(RuntimeError::Return { value });
+            }
         };
 
         Ok(())

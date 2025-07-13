@@ -12,6 +12,10 @@ pub enum Stmt {
         else_branch: Option<Box<Stmt>>,
     },
     Print(Expr),
+    Return {
+        keyword: Token,
+        value_expr: Option<Expr>,
+    },
     Var {
         name: Token,
         initializer: Option<Expr>,

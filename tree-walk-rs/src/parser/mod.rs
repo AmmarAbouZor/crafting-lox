@@ -131,6 +131,7 @@ impl Parser {
     ///           | forStmt
     ///           | ifStmt
     ///           | printStmt
+    ///           | returnStmt
     ///           | whileStmt
     ///           | block ;
     /// ```
@@ -143,6 +144,10 @@ impl Parser {
         }
         if self.match_then_consume(&[TT::Print]) {
             return self.print_statement();
+        }
+
+        if self.match_then_consume(&[TT::Return]) {
+            return self.return_statement();
         }
 
         if self.match_then_consume(&[TT::While]) {
@@ -263,11 +268,37 @@ impl Parser {
         Ok(stmts)
     }
 
+    /// Definition:
+    /// ```text
+    /// printStmt → "print" expression ";" ;
+    /// ```
     fn print_statement(&mut self) -> Result<Stmt> {
         let expr = self.expression()?;
         self.consume(&TT::SemiColon, "Expect ';' after value.")?;
 
         let stmt = Stmt::Print(expr);
+
+        Ok(stmt)
+    }
+
+    /// Definition:
+    /// ```text
+    // returnStmt → "return" expression? ";" ;
+    /// ```
+    fn return_statement(&mut self) -> Result<Stmt> {
+        let keyword = self.previous().to_owned();
+        let value = if self.check(&TT::SemiColon) {
+            None
+        } else {
+            Some(self.expression()?)
+        };
+
+        self.consume(&TT::SemiColon, "Expect ';' after return value")?;
+
+        let stmt = Stmt::Return {
+            keyword,
+            value_expr: value,
+        };
 
         Ok(stmt)
     }
