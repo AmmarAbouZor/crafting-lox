@@ -26,7 +26,7 @@ impl Display for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RuntimeError::Error { token, message } => {
-                writeln!(f, "{}", message)?;
+                writeln!(f, "{message}")?;
                 write!(f, "[line {}]", token.line)
             }
             RuntimeError::Return { value } => {

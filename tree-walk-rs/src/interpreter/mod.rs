@@ -24,6 +24,12 @@ pub struct Interpreter {
     environment: EnvironmentRef,
 }
 
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Interpreter {
     pub fn new() -> Self {
         let mut globals = Environment::default();

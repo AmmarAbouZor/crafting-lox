@@ -53,7 +53,7 @@ impl LoxCallable {
     ) -> Result<LoxValue> {
         let environment = Environment::with_enclosing(interprerter.globals.clone());
         let mut env_borrow = environment.borrow_mut();
-        for (arg, param) in arguments.into_iter().zip(declaration.params.iter()) {
+        for (arg, param) in arguments.iter().zip(declaration.params.iter()) {
             env_borrow.define(param.lexeme.to_owned(), arg.to_owned());
         }
         drop(env_borrow);
