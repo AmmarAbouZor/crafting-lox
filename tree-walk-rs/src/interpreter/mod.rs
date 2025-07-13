@@ -1,3 +1,4 @@
+//TODO: General: Check why we need the types to implement PartialEq
 use std::{cell::RefCell, rc::Rc};
 
 use callables::{CLOCK_NAME, LoxCallable};
@@ -97,6 +98,7 @@ impl Interpreter {
             Stmt::Function(declaration) => {
                 let function = LoxCallable::LoxFunction {
                     declaration: declaration.to_owned(),
+                    closure: self.environment.clone(),
                 };
                 self.environment.borrow_mut().define(
                     declaration.name.lexeme.to_owned(),

@@ -4,7 +4,7 @@ use crate::{LoxValue, RuntimeError, Token};
 
 pub type EnvironmentRef = Rc<RefCell<Environment>>;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Environment {
     enclosing: Option<EnvironmentRef>,
     values: HashMap<String, LoxValue>,

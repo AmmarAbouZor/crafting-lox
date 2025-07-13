@@ -19,7 +19,12 @@ pub fn run_file(path: &Path) -> anyhow::Result<()> {
     let file_content = std::fs::read_to_string(path)
         .with_context(|| format!("Error while reading input file. Path: {}", path.display()))?;
 
-    run(file_content)?;
+    run(file_content).map_err(|err| {
+        // TODO:
+        // Anyhow errors must be Send, while the current implementation
+        // misusing errors adding Rc<RefCell<>> to them.
+        anyhow::anyhow!("{err:?}")
+    })?;
 
     Ok(())
 }
