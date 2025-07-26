@@ -52,6 +52,10 @@ impl Interpreter {
         }
     }
 
+    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+        todo!()
+    }
+
     fn execute(&mut self, stmt: &Stmt) -> Result<()> {
         match stmt {
             Stmt::Expression(expr) => {
@@ -154,7 +158,10 @@ impl Interpreter {
                 .borrow()
                 .get(name)
                 .map(|val| val.to_owned()),
-            Expr::Assign { name, expression } => {
+            Expr::Assign {
+                name,
+                value: expression,
+            } => {
                 let value = self.evaluate(expression)?;
                 self.environment.borrow_mut().assign(name, value.clone())?;
                 Ok(value)

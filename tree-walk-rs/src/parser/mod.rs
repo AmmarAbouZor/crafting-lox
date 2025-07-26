@@ -350,7 +350,7 @@ impl Parser {
                 Expr::Variable { name } => {
                     return Ok(Expr::Assign {
                         name,
-                        expression: Box::new(value),
+                        value: Box::new(value),
                     });
                 }
                 _ => {
