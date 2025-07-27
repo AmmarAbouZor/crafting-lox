@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     Token,
-    ast::{Expr, Stmt},
+    ast::{Expr, FuncDeclaration, Stmt},
     interpreter::Interpreter,
 };
 
@@ -30,27 +30,62 @@ impl Resolver {
         }
     }
 
-    //TODO: Rename if make sense
     pub fn resolve_stmt(&mut self, stmt: &Stmt) -> Result<()> {
         match stmt {
-            Stmt::Expression(expr) => {}
-            Stmt::Function(func_declaration) => {}
+            Stmt::Expression(expr) => self.resolve_expr(expr),
+            Stmt::Function(func_declaration) => self.visit_stmt_function(func_declaration),
             Stmt::If {
                 condition,
                 then_branch,
                 else_branch,
-            } => {}
-            Stmt::Print(expr) => {}
+            } => {
+                self.resolve_expr(condition)?;
+                // Static analyzing resolve both branches, as opposite to interpretation
+                // which run one of them only.
+                self.resolve_stmt(&then_branch)?;
+                if let Some(else_branch) = else_branch {
+                    self.resolve_stmt(&else_branch)?;
+                }
+                Ok(())
+            }
+            Stmt::Print(expr) => self.resolve_expr(expr),
             Stmt::Return {
-                keyword,
+                keyword: _,
                 value_expr,
-            } => {}
-            Stmt::Var { name, initializer } => return self.resolve_var(name, initializer.as_ref()),
-            Stmt::While { condition, body } => {}
-            Stmt::Block { statements } => return self.resolve_block(statements),
+            } => {
+                if let Some(value) = value_expr {
+                    self.resolve_expr(value)?
+                }
+                Ok(())
+            }
+            Stmt::Var { name, initializer } => self.resolve_var(name, initializer.as_ref()),
+            Stmt::While { condition, body } => {
+                self.resolve_expr(condition)?;
+                self.resolve_stmt(&body)
+            }
+            Stmt::Block { statements } => self.resolve_block(statements),
         }
+    }
 
-        Ok(())
+    fn visit_stmt_function(&mut self, func_declaration: &FuncDeclaration) -> Result<()> {
+        self.declare(&func_declaration.name);
+        self.define(&func_declaration.name);
+
+        self.resolve_function(func_declaration)
+    }
+
+    /// Method used for resolving stand-alone function and method on class later.
+    fn resolve_function(&mut self, func_declaration: &FuncDeclaration) -> Result<()> {
+        self.begin_scope();
+        for param in &func_declaration.params {
+            self.declare(param);
+            self.define(param);
+        }
+        //TODO: I'm not sure if I need to end scope before return on errors.
+        let resolve_res = self.resolve_stmts(&func_declaration.body);
+        self.end_scope();
+
+        resolve_res
     }
 
     fn resolve_var(&mut self, name: &Token, initializer: Option<&Expr>) -> Result<()> {
@@ -107,22 +142,35 @@ impl Resolver {
         match expr {
             Expr::Binary {
                 left,
-                operator,
+                operator: _,
                 right,
-            } => todo!(),
+            } => {
+                self.resolve_expr(&left)?;
+                self.resolve_expr(&right)
+            }
             Expr::Call {
                 callee,
-                paren,
+                paren: _,
                 arguments,
-            } => todo!(),
-            Expr::Grouping { expression } => todo!(),
-            Expr::Literal { value } => todo!(),
+            } => {
+                self.resolve_expr(&callee)?;
+                for arg in arguments {
+                    self.resolve_expr(arg)?;
+                }
+
+                Ok(())
+            }
+            Expr::Grouping { expression } => self.resolve_expr(&expression),
+            Expr::Literal { value: _ } => Ok(()),
             Expr::Logical {
                 left,
-                operator,
+                operator: _,
                 right,
-            } => todo!(),
-            Expr::Unary { operator, right } => todo!(),
+            } => {
+                self.resolve_expr(&left)?;
+                self.resolve_expr(&right)
+            }
+            Expr::Unary { operator: _, right } => self.resolve_expr(&right),
             expr @ Expr::Variable { name } => self.expr_var(expr, name),
             expr @ Expr::Assign { name, value } => self.expr_assign(expr, name, value.as_ref()),
         }
@@ -155,7 +203,6 @@ impl Resolver {
     fn resolve_local(&mut self, expr: &Expr, name: &Token) {
         for (idx, map) in self.scopes.iter().enumerate().rev() {
             if map.contains_key(&name.lexeme) {
-                //TODO: This feels that would overflow
                 self.interpreter.resolve(expr, self.scopes.len() - 1 - idx);
                 return;
             }
