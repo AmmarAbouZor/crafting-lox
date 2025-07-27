@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::{ParseError, RuntimeError};
+use crate::{ParseError, ResolveError, RuntimeError};
 
 #[derive(Error, Debug)]
 /// General error for rlox interpreter.
@@ -11,6 +11,8 @@ pub enum RunError {
     Scan(usize),
     #[error("{0}")]
     Parse(#[from] ParseError),
+    #[error("{0}")]
+    Resolve(#[from] ResolveError),
     #[error("{0}")]
     Runtime(#[from] RuntimeError),
 }

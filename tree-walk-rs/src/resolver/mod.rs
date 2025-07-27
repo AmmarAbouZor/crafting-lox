@@ -12,25 +12,41 @@ pub use error::ResolveError;
 
 type Result<T> = std::result::Result<T, ResolveError>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FunctionType {
+    None,
+    Function,
+}
+
 #[derive(Debug)]
-pub struct Resolver {
-    interpreter: Interpreter,
+pub struct Resolver<'a> {
+    interpreter: &'a mut Interpreter,
     /// The scope contains the variables in the current scope and
     /// their state with:
     /// - False: Variable declared but not defined (Not initialized with a value)
     /// - True: Variable defined with the initialized value (Which can be nil as well)
     scopes: Vec<HashMap<String, bool>>,
+    current_function: FunctionType,
 }
 
-impl Resolver {
-    pub fn new(interpreter: Interpreter) -> Self {
+impl<'a> Resolver<'a> {
+    pub fn new(interpreter: &'a mut Interpreter) -> Self {
         Self {
             interpreter,
             scopes: Vec::new(),
+            current_function: FunctionType::None,
         }
     }
 
-    pub fn resolve_stmt(&mut self, stmt: &Stmt) -> Result<()> {
+    pub fn resolve_stmts(&mut self, stmts: &[Stmt]) -> Result<()> {
+        for stmt in stmts {
+            self.resolve_stmt(stmt)?;
+        }
+
+        Ok(())
+    }
+
+    fn resolve_stmt(&mut self, stmt: &Stmt) -> Result<()> {
         match stmt {
             Stmt::Expression(expr) => self.resolve_expr(expr),
             Stmt::Function(func_declaration) => self.visit_stmt_function(func_declaration),
@@ -42,17 +58,23 @@ impl Resolver {
                 self.resolve_expr(condition)?;
                 // Static analyzing resolve both branches, as opposite to interpretation
                 // which run one of them only.
-                self.resolve_stmt(&then_branch)?;
+                self.resolve_stmt(then_branch)?;
                 if let Some(else_branch) = else_branch {
-                    self.resolve_stmt(&else_branch)?;
+                    self.resolve_stmt(else_branch)?;
                 }
                 Ok(())
             }
             Stmt::Print(expr) => self.resolve_expr(expr),
             Stmt::Return {
-                keyword: _,
+                keyword,
                 value_expr,
             } => {
+                if self.current_function == FunctionType::None {
+                    return Err(ResolveError::new(
+                        keyword.to_owned(),
+                        "Can't return from top level code",
+                    ));
+                }
                 if let Some(value) = value_expr {
                     self.resolve_expr(value)?
                 }
@@ -61,29 +83,36 @@ impl Resolver {
             Stmt::Var { name, initializer } => self.resolve_var(name, initializer.as_ref()),
             Stmt::While { condition, body } => {
                 self.resolve_expr(condition)?;
-                self.resolve_stmt(&body)
+                self.resolve_stmt(body)
             }
             Stmt::Block { statements } => self.resolve_block(statements),
         }
     }
 
     fn visit_stmt_function(&mut self, func_declaration: &FuncDeclaration) -> Result<()> {
-        self.declare(&func_declaration.name);
+        self.declare(&func_declaration.name)?;
         self.define(&func_declaration.name);
 
-        self.resolve_function(func_declaration)
+        self.resolve_function(func_declaration, FunctionType::Function)
     }
 
     /// Method used for resolving stand-alone function and method on class later.
-    fn resolve_function(&mut self, func_declaration: &FuncDeclaration) -> Result<()> {
+    fn resolve_function(
+        &mut self,
+        func_declaration: &FuncDeclaration,
+        typ: FunctionType,
+    ) -> Result<()> {
+        let enclosing_fun = self.current_function;
+        self.current_function = typ;
         self.begin_scope();
         for param in &func_declaration.params {
-            self.declare(param);
+            self.declare(param)?;
             self.define(param);
         }
-        //TODO: I'm not sure if I need to end scope before return on errors.
         let resolve_res = self.resolve_stmts(&func_declaration.body);
         self.end_scope();
+
+        self.current_function = enclosing_fun;
 
         resolve_res
     }
@@ -98,7 +127,7 @@ impl Resolver {
         // }
         // ```
         // In such case we need to return an error.
-        self.declare(name);
+        self.declare(name)?;
         if let Some(expr) = initializer {
             self.resolve_expr(expr)?;
         }
@@ -107,10 +136,17 @@ impl Resolver {
         Ok(())
     }
 
-    fn declare(&mut self, name: &Token) {
+    fn declare(&mut self, name: &Token) -> Result<()> {
         if let Some(map) = self.scopes.last_mut() {
-            map.insert(name.lexeme.to_owned(), false);
+            if map.insert(name.lexeme.to_owned(), false).is_some() {
+                return Err(ResolveError::new(
+                    name.to_owned(),
+                    "Already a variable with the same name in this scope",
+                ));
+            }
         }
+
+        Ok(())
     }
 
     fn define(&mut self, name: &Token) {
@@ -130,47 +166,39 @@ impl Resolver {
         Ok(())
     }
 
-    fn resolve_stmts(&mut self, stmts: &[Stmt]) -> Result<()> {
-        for stmt in stmts {
-            self.resolve_stmt(stmt)?;
-        }
-
-        Ok(())
-    }
-
-    pub fn resolve_expr(&mut self, expr: &Expr) -> Result<()> {
+    fn resolve_expr(&mut self, expr: &Expr) -> Result<()> {
         match expr {
             Expr::Binary {
                 left,
                 operator: _,
                 right,
             } => {
-                self.resolve_expr(&left)?;
-                self.resolve_expr(&right)
+                self.resolve_expr(left)?;
+                self.resolve_expr(right)
             }
             Expr::Call {
                 callee,
                 paren: _,
                 arguments,
             } => {
-                self.resolve_expr(&callee)?;
+                self.resolve_expr(callee)?;
                 for arg in arguments {
                     self.resolve_expr(arg)?;
                 }
 
                 Ok(())
             }
-            Expr::Grouping { expression } => self.resolve_expr(&expression),
+            Expr::Grouping { expression } => self.resolve_expr(expression),
             Expr::Literal { value: _ } => Ok(()),
             Expr::Logical {
                 left,
                 operator: _,
                 right,
             } => {
-                self.resolve_expr(&left)?;
-                self.resolve_expr(&right)
+                self.resolve_expr(left)?;
+                self.resolve_expr(right)
             }
-            Expr::Unary { operator: _, right } => self.resolve_expr(&right),
+            Expr::Unary { operator: _, right } => self.resolve_expr(right),
             expr @ Expr::Variable { name } => self.expr_var(expr, name),
             expr @ Expr::Assign { name, value } => self.expr_assign(expr, name, value.as_ref()),
         }
@@ -178,10 +206,7 @@ impl Resolver {
 
     fn expr_var(&mut self, expr: &Expr, name: &Token) -> Result<()> {
         if let Some(map) = self.scopes.last()
-            && map
-                .get(&name.lexeme)
-                .expect("Variable must be declared before expression resolve")
-                == &false
+            && map.get(&name.lexeme).is_some_and(|val| *val == false)
         {
             return Err(ResolveError::new(
                 name.to_owned(),

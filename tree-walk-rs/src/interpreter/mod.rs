@@ -23,6 +23,9 @@ type Result<T> = std::result::Result<T, RuntimeError>;
 pub struct Interpreter {
     globals: EnvironmentRef,
     environment: EnvironmentRef,
+    // This is implemented as a map in the book, however this is not possible
+    // in rust because `Expr` can't implement `Ord, Eq, Hash`
+    locals: Vec<(Expr, usize)>,
 }
 
 impl Default for Interpreter {
@@ -41,6 +44,7 @@ impl Interpreter {
         Self {
             globals,
             environment,
+            locals: Vec::new(),
         }
     }
     pub fn interpret(&mut self, stmts: &[Stmt]) {
@@ -53,7 +57,12 @@ impl Interpreter {
     }
 
     pub fn resolve(&mut self, expr: &Expr, depth: usize) {
-        todo!()
+        //TODO: Check if the same expression can be defined twice and remove this if not.
+        if let Some((_exp, dep)) = self.locals.iter_mut().find(|(ex, _dep)| ex == expr) {
+            *dep = depth;
+        } else {
+            self.locals.push((expr.to_owned(), depth));
+        }
     }
 
     fn execute(&mut self, stmt: &Stmt) -> Result<()> {
@@ -153,19 +162,8 @@ impl Interpreter {
                 operator,
                 right,
             } => self.evaluate_binary(left, operator, right),
-            Expr::Variable { name } => self
-                .environment
-                .borrow()
-                .get(name)
-                .map(|val| val.to_owned()),
-            Expr::Assign {
-                name,
-                value: expression,
-            } => {
-                let value = self.evaluate(expression)?;
-                self.environment.borrow_mut().assign(name, value.clone())?;
-                Ok(value)
-            }
+            expr @ Expr::Variable { name } => self.lookup_variable(expr, name),
+            expr @ Expr::Assign { name, value } => self.assign_expr(expr, name, value),
             Expr::Logical {
                 left,
                 operator,
@@ -177,6 +175,35 @@ impl Interpreter {
                 arguments,
             } => self.evaluate_call(callee, paren, arguments),
         }
+    }
+
+    fn lookup_variable(&mut self, main_expr: &Expr, name: &Token) -> Result<LoxValue> {
+        let distance = self.get_distance(main_expr);
+        if let Some(dist) = distance {
+            let val = Environment::get_at(self.environment.clone(), dist, &name.lexeme);
+            Ok(val)
+        } else {
+            self.globals.borrow().get(name)
+        }
+    }
+
+    fn get_distance(&self, expr: &Expr) -> Option<usize> {
+        self.locals
+            .iter()
+            .find(|(ex, _depth)| ex == expr)
+            .map(|(_, depth)| *depth)
+    }
+
+    fn assign_expr(&mut self, main_exp: &Expr, name: &Token, value: &Expr) -> Result<LoxValue> {
+        let value = self.evaluate(value)?;
+        let dist = self.get_distance(main_exp);
+        if let Some(distance) = dist {
+            Environment::assign_at(self.environment.clone(), distance, name, value.clone());
+        } else {
+            self.globals.borrow_mut().assign(name, value.clone())?;
+        }
+
+        Ok(value)
     }
 
     fn evaluate_call(

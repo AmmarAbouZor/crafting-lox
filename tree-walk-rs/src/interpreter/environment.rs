@@ -39,6 +39,30 @@ impl Environment {
         ))
     }
 
+    pub fn get_at(current: EnvironmentRef, depth: usize, name: &str) -> LoxValue {
+        Self::find_ancestor(current, depth)
+            .borrow()
+            .values
+            .get(name)
+            .expect(" Value must be avaible since becuase it defined in locals")
+            .to_owned()
+    }
+
+    fn find_ancestor(current: EnvironmentRef, distance: usize) -> EnvironmentRef {
+        let mut env = current;
+        for _ in 0..distance {
+            let temp = env
+                .borrow()
+                .enclosing
+                .as_ref()
+                .expect("It should contain a value")
+                .clone();
+            env = temp
+        }
+
+        env
+    }
+
     pub fn assign(&mut self, name: &Token, value: LoxValue) -> Result<(), RuntimeError> {
         if let Some(old_val) = self.values.get_mut(&name.lexeme) {
             *old_val = value;
@@ -53,5 +77,12 @@ impl Environment {
             name.to_owned(),
             format!("Undefined variable '{}'.", name.lexeme),
         ))
+    }
+
+    pub fn assign_at(current: EnvironmentRef, distance: usize, name: &Token, value: LoxValue) {
+        Self::find_ancestor(current, distance)
+            .borrow_mut()
+            .values
+            .insert(name.lexeme.to_owned(), value);
     }
 }
