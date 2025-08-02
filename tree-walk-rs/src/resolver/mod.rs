@@ -16,6 +16,7 @@ type Result<T> = std::result::Result<T, ResolveError>;
 enum FunctionType {
     None,
     Function,
+    Initializer,
     Method,
 }
 
@@ -77,18 +78,7 @@ impl<'a> Resolver<'a> {
             Stmt::Return {
                 keyword,
                 value_expr,
-            } => {
-                if self.current_function == FunctionType::None {
-                    return Err(ResolveError::new(
-                        keyword.to_owned(),
-                        "Can't return from top level code",
-                    ));
-                }
-                if let Some(value) = value_expr {
-                    self.resolve_expr(value)?
-                }
-                Ok(())
-            }
+            } => self.resolve_return(keyword, value_expr.as_ref()),
             Stmt::Var { name, initializer } => self.resolve_var(name, initializer.as_ref()),
             Stmt::While { condition, body } => {
                 self.resolve_expr(condition)?;
@@ -97,6 +87,25 @@ impl<'a> Resolver<'a> {
             Stmt::Block { statements } => self.resolve_block(statements),
             Stmt::Class { name, methods } => self.resolve_stmt_class(name, methods),
         }
+    }
+
+    fn resolve_return(&mut self, keyword: &Token, value_expr: Option<&Expr>) -> Result<()> {
+        if self.current_function == FunctionType::None {
+            return Err(ResolveError::new(
+                keyword.to_owned(),
+                "Can't return from top level code",
+            ));
+        }
+        if let Some(value) = value_expr {
+            if self.current_function == FunctionType::Initializer {
+                return Err(ResolveError::new(
+                    keyword.to_owned(),
+                    "Can't return a value fron an initializer.",
+                ));
+            }
+            self.resolve_expr(value)?
+        }
+        Ok(())
     }
 
     fn resolve_stmt_class(&mut self, name: &Token, methods: &[FuncDeclaration]) -> Result<()> {
@@ -118,7 +127,12 @@ impl<'a> Resolver<'a> {
         s.scopes.last_mut().unwrap().insert("this".into(), true);
 
         for method in methods {
-            s.resolve_function(method, FunctionType::Method)?;
+            let declaration = if method.name.lexeme == "init" {
+                FunctionType::Initializer
+            } else {
+                FunctionType::Method
+            };
+            s.resolve_function(method, declaration)?;
         }
 
         Ok(())

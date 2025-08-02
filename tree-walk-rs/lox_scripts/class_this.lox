@@ -1,3 +1,4 @@
+// *** Property assigning after function declaration ***
 class Cake {
   taste() {
     var adjective = "delicious";
@@ -9,7 +10,7 @@ var cake = Cake();
 cake.flavor = "German chocolate";
 cake.taste(); // Prints "The German chocolate cake is delicious!".
 
-// ----------------------- 
+// *** callback for unnamed class ***
 
 class Thing {
   getCallback() {
@@ -23,3 +24,13 @@ class Thing {
 
 var callback = Thing().getCallback();
 callback();
+
+// *** Invoke init() directly ***
+class Foo {
+  init() {
+    print this;
+  }
+}
+
+var foo = Foo();
+print foo.init();

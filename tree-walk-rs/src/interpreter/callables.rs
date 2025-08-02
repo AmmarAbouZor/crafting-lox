@@ -2,7 +2,7 @@ use std::{fmt::Display, time::SystemTime};
 
 use crate::{RuntimeError, Token, TokenType};
 
-use super::{Interpreter, LoxValue, class::LoxClass, function::LoxFunction, instance::LoxInstance};
+use super::{Interpreter, LoxValue, class::LoxClass, function::LoxFunction};
 
 type Result<T> = std::result::Result<T, RuntimeError>;
 
@@ -22,10 +22,7 @@ impl LoxCallable {
         match self {
             LoxCallable::Clock => Self::clock(),
             LoxCallable::LoxFunction(func) => func.call(interprerter, arguments),
-            LoxCallable::Class(lox_class) => {
-                let instance = LoxInstance::new(lox_class.to_owned());
-                Ok(LoxValue::Instance(instance))
-            }
+            LoxCallable::Class(lox_class) => lox_class.call(interprerter, arguments),
         }
     }
 
@@ -33,7 +30,7 @@ impl LoxCallable {
         match self {
             LoxCallable::Clock => 0,
             LoxCallable::LoxFunction(func) => func.arity(),
-            LoxCallable::Class(_lox_class) => 0,
+            LoxCallable::Class(lox_class) => lox_class.arity(),
         }
     }
 

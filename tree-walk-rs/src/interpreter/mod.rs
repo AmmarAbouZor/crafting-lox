@@ -115,7 +115,8 @@ impl Interpreter {
                 }
             }
             Stmt::Function(declaration) => {
-                let func = LoxFunction::new(declaration.to_owned(), self.environment.clone());
+                let func =
+                    LoxFunction::new(declaration.to_owned(), self.environment.clone(), false);
                 let function = LoxCallable::LoxFunction(func);
                 self.environment.borrow_mut().define(
                     declaration.name.lexeme.to_owned(),
@@ -150,7 +151,9 @@ impl Interpreter {
         let mut meth = HashMap::new();
 
         for method in methods {
-            let function = LoxFunction::new(method.to_owned(), self.environment.clone());
+            let is_initializer = method.name.lexeme == "init";
+            let function =
+                LoxFunction::new(method.to_owned(), self.environment.clone(), is_initializer);
             meth.insert(method.name.lexeme.to_owned(), function);
         }
 

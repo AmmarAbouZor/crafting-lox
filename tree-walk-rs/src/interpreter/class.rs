@@ -1,6 +1,8 @@
 use std::{collections::HashMap, fmt::Display};
 
-use super::function::LoxFunction;
+use crate::{RuntimeError, interpreter::instance::LoxInstance};
+
+use super::{Interpreter, LoxValue, function::LoxFunction};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoxClass {
@@ -15,6 +17,28 @@ impl LoxClass {
 
     pub fn find_method(&self, name: &str) -> Option<&LoxFunction> {
         self.methods.get(name)
+    }
+
+    pub fn call(
+        &self,
+        interprerter: &mut Interpreter,
+        arguments: &[LoxValue],
+    ) -> Result<LoxValue, RuntimeError> {
+        let instance = LoxInstance::new(self.to_owned());
+        if let Some(initializer) = self.find_method("init") {
+            initializer
+                .bind(instance.clone())
+                .call(interprerter, arguments)?;
+        };
+        Ok(LoxValue::Instance(instance))
+    }
+
+    pub fn arity(&self) -> usize {
+        if let Some(initializer) = self.find_method("init") {
+            initializer.arity()
+        } else {
+            0
+        }
     }
 }
 

@@ -12,13 +12,19 @@ use super::{
 pub struct LoxFunction {
     pub declaration: FuncDeclaration,
     pub closure: EnvironmentRef,
+    is_initializer: bool,
 }
 
 impl LoxFunction {
-    pub fn new(declaration: FuncDeclaration, closure: EnvironmentRef) -> Self {
+    pub fn new(
+        declaration: FuncDeclaration,
+        closure: EnvironmentRef,
+        is_initializer: bool,
+    ) -> Self {
         Self {
             declaration,
             closure,
+            is_initializer,
         }
     }
 
@@ -39,8 +45,22 @@ impl LoxFunction {
         drop(env_borrow);
 
         match interprerter.execute_block(&self.declaration.body, environment) {
-            Ok(()) => Ok(LoxValue::Nil),
-            Err(RuntimeError::Return { value }) => Ok(*value),
+            Ok(()) => {
+                let value = if self.is_initializer {
+                    Environment::get_at(self.closure.clone(), 0, "this")
+                } else {
+                    LoxValue::Nil
+                };
+                Ok(value)
+            }
+            Err(RuntimeError::Return { value }) => {
+                let value = if self.is_initializer {
+                    Environment::get_at(self.closure.clone(), 0, "this")
+                } else {
+                    *value
+                };
+                Ok(value)
+            }
             Err(err) => Err(err),
         }
     }
@@ -50,7 +70,7 @@ impl LoxFunction {
         env.borrow_mut()
             .define("this".into(), LoxValue::Instance(instance));
 
-        LoxFunction::new(self.declaration.clone(), env)
+        LoxFunction::new(self.declaration.clone(), env, self.is_initializer)
     }
 }
 
