@@ -191,7 +191,38 @@ impl Interpreter {
                 paren,
                 arguments,
             } => self.evaluate_call(callee, paren, arguments),
+            Expr::Get { object, name } => self.evaluate_get(object, name),
+            Expr::Set {
+                object,
+                name,
+                value,
+            } => self.evaluate_set(object, name, value),
         }
+    }
+
+    fn evaluate_get(&mut self, object: &Expr, name: &Token) -> Result<LoxValue> {
+        match self.evaluate(object)? {
+            LoxValue::Instance(lox_instance) => lox_instance.get(name),
+            _ => Err(RuntimeError::new(
+                name.to_owned(),
+                "Only instances have properties.",
+            )),
+        }
+    }
+
+    fn evaluate_set(&mut self, object: &Expr, name: &Token, value: &Expr) -> Result<LoxValue> {
+        let object = self.evaluate(object)?;
+        let LoxValue::Instance(mut instance) = object else {
+            return Err(RuntimeError::new(
+                name.to_owned(),
+                "Only instances have fields.",
+            ));
+        };
+
+        let value = self.evaluate(value)?;
+        instance.set(name, value.clone());
+
+        Ok(value)
     }
 
     fn lookup_variable(&mut self, main_expr: &Expr, name: &Token) -> Result<LoxValue> {

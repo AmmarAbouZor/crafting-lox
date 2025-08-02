@@ -1,15 +1,35 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
-use super::class::LoxClass;
+use crate::{RuntimeError, Token};
+
+use super::{LoxValue, class::LoxClass};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoxInstance {
     class: LoxClass,
+    fields: HashMap<String, LoxValue>,
 }
 
 impl LoxInstance {
     pub fn new(class: LoxClass) -> Self {
-        Self { class }
+        let fields = HashMap::new();
+        Self { class, fields }
+    }
+
+    pub fn get(&self, name: &Token) -> Result<LoxValue, RuntimeError> {
+        self.fields
+            .get(&name.lexeme)
+            .map(|v| v.to_owned())
+            .ok_or_else(|| {
+                RuntimeError::new(
+                    name.to_owned(),
+                    format!("Undefined property '{}'.", name.lexeme),
+                )
+            })
+    }
+
+    pub fn set(&mut self, name: &Token, value: LoxValue) {
+        self.fields.insert(name.lexeme.to_owned(), value);
     }
 }
 

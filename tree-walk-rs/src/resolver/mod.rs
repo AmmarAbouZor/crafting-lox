@@ -209,6 +209,15 @@ impl<'a> Resolver<'a> {
             Expr::Unary { operator: _, right } => self.resolve_expr(right),
             expr @ Expr::Variable { name } => self.expr_var(expr, name),
             expr @ Expr::Assign { name, value } => self.expr_assign(expr, name, value.as_ref()),
+            Expr::Get { object, name: _ } => self.resolve_expr(&object),
+            Expr::Set {
+                object,
+                name: _,
+                value,
+            } => {
+                self.resolve_expr(&object)?;
+                self.resolve_expr(&value)
+            }
         }
     }
 

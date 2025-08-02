@@ -366,7 +366,7 @@ impl Parser {
 
     /// Definition:
     /// ```text
-    /// assignment → IDENTIFIER "=" assignment
+    /// assignment → (call ".")? IDENTIFIER "=" assignment
     ///            | logic_or ;
     /// ```
     fn assignment(&mut self) -> Result<Expr> {
@@ -381,6 +381,16 @@ impl Parser {
                         name,
                         value: Box::new(value),
                     });
+                }
+                // This should solve chaining multiple fields then assign the last one
+                // Example: `foo.bar.baz = 1;`
+                Expr::Get { object, name } => {
+                    let expr = Expr::Set {
+                        object,
+                        name,
+                        value: Box::new(value),
+                    };
+                    return Ok(expr);
                 }
                 _ => {
                     let equals = self.previous().to_owned();
@@ -555,7 +565,7 @@ impl Parser {
 
     /// Definition:
     /// ```text
-    /// call      → primary ( "(" arguments? ")" )* ;
+    /// call      → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
     /// arguments → expression ( "," expression )* ;
     /// ```
     pub fn call(&mut self) -> Result<Expr> {
@@ -564,6 +574,14 @@ impl Parser {
         loop {
             if self.match_then_consume(&[TT::LeftParen]) {
                 expr = self.finish_call(expr)?;
+            } else if self.match_then_consume(&[TT::Dot]) {
+                let name = self
+                    .consume_identifier("Expect property name after '.'.")?
+                    .to_owned();
+                expr = Expr::Get {
+                    object: Box::new(expr),
+                    name,
+                };
             } else {
                 break;
             }

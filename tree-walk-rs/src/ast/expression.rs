@@ -19,6 +19,10 @@ pub enum Expr {
         paren: Token,
         arguments: Vec<Expr>,
     },
+    Get {
+        object: Box<Expr>,
+        name: Token,
+    },
     Grouping {
         expression: Box<Expr>,
     },
@@ -29,6 +33,11 @@ pub enum Expr {
         left: Box<Expr>,
         operator: Token,
         right: Box<Expr>,
+    },
+    Set {
+        object: Box<Expr>,
+        name: Token,
+        value: Box<Expr>,
     },
     Unary {
         operator: Token,
@@ -87,6 +96,12 @@ impl Expr {
                     .collect();
                 parenthesize("function", &exprs)
             }
+            Expr::Get { object, name } => parenthesize(format!("Get {name}").as_str(), &[object]),
+            Expr::Set {
+                object,
+                name,
+                value,
+            } => parenthesize(format!("Set {name}").as_str(), &[object, value]),
         }
     }
 }
