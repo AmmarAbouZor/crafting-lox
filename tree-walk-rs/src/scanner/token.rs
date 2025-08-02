@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -61,6 +62,9 @@ impl Display for TokenType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
+    // NOTE: ID is needed to identify tokens in the same line
+    // like `for (var i = 0; i < 20; i = i + 1)`
+    id: u64,
     pub typ: TokenType,
     pub lexeme: String,
     pub line: usize,
@@ -68,7 +72,15 @@ pub struct Token {
 
 impl Token {
     pub fn new(typ: TokenType, lexeme: impl Into<String>, line: usize) -> Self {
+        thread_local! {
+            pub static COUNTER: Cell<u64> = const{ Cell::new(0) };
+        };
+
+        let id = COUNTER.get();
+        COUNTER.set(id + 1);
+
         Self {
+            id,
             typ,
             lexeme: lexeme.into(),
             line,

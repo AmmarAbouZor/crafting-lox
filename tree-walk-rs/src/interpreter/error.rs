@@ -10,7 +10,7 @@ pub enum RuntimeError {
     // TODO: I think Error is misused here for return statements.
     // For now I'll keep it like this to continue with the book but
     // I should look into other solutions once the first part is done.
-    Return { value: LoxValue },
+    Return { value: Box<LoxValue> },
 }
 
 impl RuntimeError {

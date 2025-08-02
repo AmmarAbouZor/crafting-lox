@@ -71,7 +71,7 @@ impl LoxCallable {
 
         match interprerter.execute_block(&declaration.body, environment) {
             Ok(()) => Ok(LoxValue::Nil),
-            Err(RuntimeError::Return { value }) => Ok(value),
+            Err(RuntimeError::Return { value }) => Ok(*value),
             Err(err) => Err(err),
         }
     }

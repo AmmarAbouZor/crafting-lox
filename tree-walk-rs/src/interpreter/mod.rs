@@ -128,7 +128,9 @@ impl Interpreter {
                 };
 
                 // Misuse of errors since they will bubble up the call stack
-                return Err(RuntimeError::Return { value });
+                return Err(RuntimeError::Return {
+                    value: Box::new(value),
+                });
             }
         };
 

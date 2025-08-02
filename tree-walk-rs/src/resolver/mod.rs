@@ -104,9 +104,15 @@ impl<'a> Resolver<'a> {
     ) -> Result<()> {
         let enclosing_fun = self.current_function;
         self.current_function = typ;
+
         self.begin_scope();
         for param in &func_declaration.params {
-            self.declare(param)?;
+            if let Err(err) = self.declare(param) {
+                self.end_scope();
+                self.current_function = enclosing_fun;
+
+                return Err(err);
+            }
             self.define(param);
         }
         let resolve_res = self.resolve_stmts(&func_declaration.body);
@@ -128,8 +134,8 @@ impl<'a> Resolver<'a> {
         // ```
         // In such case we need to return an error.
         self.declare(name)?;
-        if let Some(expr) = initializer {
-            self.resolve_expr(expr)?;
+        if let Some(init) = initializer {
+            self.resolve_expr(init)?;
         }
         self.define(name);
 
@@ -160,10 +166,10 @@ impl<'a> Resolver<'a> {
 
     fn resolve_block(&mut self, stmts: &[Stmt]) -> Result<()> {
         self.begin_scope();
-        self.resolve_stmts(stmts)?;
+        let res = self.resolve_stmts(stmts);
         self.end_scope();
 
-        Ok(())
+        res
     }
 
     fn resolve_expr(&mut self, expr: &Expr) -> Result<()> {
@@ -206,7 +212,7 @@ impl<'a> Resolver<'a> {
 
     fn expr_var(&mut self, expr: &Expr, name: &Token) -> Result<()> {
         if let Some(map) = self.scopes.last()
-            && map.get(&name.lexeme).is_some_and(|val| *val == false)
+            && map.get(&name.lexeme).is_some_and(|val| !val)
         {
             return Err(ResolveError::new(
                 name.to_owned(),
