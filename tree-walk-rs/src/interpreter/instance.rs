@@ -1,8 +1,10 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{RuntimeError, Token};
 
-use super::{LoxValue, class::LoxClass};
+use super::{LoxValue, callables::LoxCallable, class::LoxClass};
+
+pub type LoxInstanceRef = Rc<RefCell<LoxInstance>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoxInstance {
@@ -11,18 +13,21 @@ pub struct LoxInstance {
 }
 
 impl LoxInstance {
-    pub fn new(class: LoxClass) -> Self {
+    pub fn new(class: LoxClass) -> LoxInstanceRef {
         let fields = HashMap::new();
-        Self { class, fields }
+        let instance = Self { class, fields };
+        Rc::new(RefCell::new(instance))
     }
 
-    pub fn get(&self, name: &Token) -> Result<LoxValue, RuntimeError> {
-        if let Some(value) = self.fields.get(&name.lexeme) {
+    pub fn get(inst_ref: LoxInstanceRef, name: &Token) -> Result<LoxValue, RuntimeError> {
+        let instance = inst_ref.borrow();
+        if let Some(value) = instance.fields.get(&name.lexeme) {
             return Ok(value.to_owned());
         }
 
-        if let Some(method) = self.class.find_method(&name.lexeme) {
-            return Ok(LoxValue::Callable(method.to_owned()));
+        if let Some(method) = instance.class.find_method(&name.lexeme) {
+            let func = method.bind(inst_ref.clone());
+            return Ok(LoxValue::Callable(LoxCallable::LoxFunction(func)));
         }
 
         Err(RuntimeError::new(

@@ -652,6 +652,9 @@ impl Parser {
                     expression: Box::new(expr),
                 }
             }
+            TT::This => Expr::This {
+                keyword: self.previous().to_owned(),
+            },
             TT::Identifier(..) => Expr::Variable {
                 name: token.to_owned(),
             },

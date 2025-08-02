@@ -39,6 +39,9 @@ pub enum Expr {
         name: Token,
         value: Box<Expr>,
     },
+    This {
+        keyword: Token,
+    },
     Unary {
         operator: Token,
         right: Box<Expr>,
@@ -102,6 +105,7 @@ impl Expr {
                 name,
                 value,
             } => parenthesize(format!("Set {name}").as_str(), &[object, value]),
+            Expr::This { keyword } => String::from("This"),
         }
     }
 }

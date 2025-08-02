@@ -4,6 +4,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use callables::{CLOCK_NAME, LoxCallable};
 use class::LoxClass;
 use error::RuntimeError;
+use function::LoxFunction;
+use instance::LoxInstance;
 
 use crate::{
     Token, TokenType as TT,
@@ -14,6 +16,7 @@ mod callables;
 mod class;
 mod environment;
 pub mod error;
+mod function;
 mod instance;
 mod values;
 
@@ -112,10 +115,8 @@ impl Interpreter {
                 }
             }
             Stmt::Function(declaration) => {
-                let function = LoxCallable::LoxFunction {
-                    declaration: declaration.to_owned(),
-                    closure: self.environment.clone(),
-                };
+                let func = LoxFunction::new(declaration.to_owned(), self.environment.clone());
+                let function = LoxCallable::LoxFunction(func);
                 self.environment.borrow_mut().define(
                     declaration.name.lexeme.to_owned(),
                     LoxValue::Callable(function),
@@ -149,11 +150,7 @@ impl Interpreter {
         let mut meth = HashMap::new();
 
         for method in methods {
-            let function = LoxCallable::LoxFunction {
-                declaration: method.to_owned(),
-                closure: self.environment.clone(),
-            };
-
+            let function = LoxFunction::new(method.to_owned(), self.environment.clone());
             meth.insert(method.name.lexeme.to_owned(), function);
         }
 
@@ -209,12 +206,13 @@ impl Interpreter {
                 name,
                 value,
             } => self.evaluate_set(object, name, value),
+            expr @ Expr::This { keyword } => self.lookup_variable(expr, keyword),
         }
     }
 
     fn evaluate_get(&mut self, object: &Expr, name: &Token) -> Result<LoxValue> {
         match self.evaluate(object)? {
-            LoxValue::Instance(lox_instance) => lox_instance.get(name),
+            LoxValue::Instance(lox_instance) => LoxInstance::get(lox_instance, name),
             _ => Err(RuntimeError::new(
                 name.to_owned(),
                 "Only instances have properties.",
@@ -224,7 +222,7 @@ impl Interpreter {
 
     fn evaluate_set(&mut self, object: &Expr, name: &Token, value: &Expr) -> Result<LoxValue> {
         let object = self.evaluate(object)?;
-        let LoxValue::Instance(mut instance) = object else {
+        let LoxValue::Instance(instance) = object else {
             return Err(RuntimeError::new(
                 name.to_owned(),
                 "Only instances have fields.",
@@ -232,7 +230,7 @@ impl Interpreter {
         };
 
         let value = self.evaluate(value)?;
-        instance.set(name, value.clone());
+        instance.borrow_mut().set(name, value.clone());
 
         Ok(value)
     }

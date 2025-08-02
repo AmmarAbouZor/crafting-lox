@@ -19,6 +19,12 @@ enum FunctionType {
     Method,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClassType {
+    None,
+    Class,
+}
+
 #[derive(Debug)]
 pub struct Resolver<'a> {
     interpreter: &'a mut Interpreter,
@@ -28,6 +34,7 @@ pub struct Resolver<'a> {
     /// - True: Variable defined with the initialized value (Which can be nil as well)
     scopes: Vec<HashMap<String, bool>>,
     current_function: FunctionType,
+    current_class: ClassType,
 }
 
 impl<'a> Resolver<'a> {
@@ -36,6 +43,7 @@ impl<'a> Resolver<'a> {
             interpreter,
             scopes: Vec::new(),
             current_function: FunctionType::None,
+            current_class: ClassType::None,
         }
     }
 
@@ -92,12 +100,27 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_stmt_class(&mut self, name: &Token, methods: &[FuncDeclaration]) -> Result<()> {
-        self.declare(name)?;
+        let enclusing_class = self.current_class;
+        self.current_class = ClassType::Class;
+
+        if let Err(err) = self.declare(name) {
+            self.current_class = enclusing_class;
+            return Err(err);
+        }
         self.define(name);
 
+        self.begin_scope();
+        let mut s = scopeguard::guard(self, |s| {
+            s.end_scope();
+            s.current_class = enclusing_class;
+        });
+
+        s.scopes.last_mut().unwrap().insert("this".into(), true);
+
         for method in methods {
-            self.resolve_function(method, FunctionType::Method)?;
+            s.resolve_function(method, FunctionType::Method)?;
         }
+
         Ok(())
     }
 
@@ -224,6 +247,16 @@ impl<'a> Resolver<'a> {
             } => {
                 self.resolve_expr(object)?;
                 self.resolve_expr(value)
+            }
+            expr @ Expr::This { keyword } => {
+                if self.current_class == ClassType::None {
+                    return Err(ResolveError::new(
+                        keyword.to_owned(),
+                        "Can't use 'this' outside of a class.",
+                    ));
+                }
+                self.resolve_local(expr, keyword);
+                Ok(())
             }
         }
     }

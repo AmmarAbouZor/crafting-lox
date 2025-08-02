@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::ast::LiteralValue;
 
-use super::{callables::LoxCallable, instance::LoxInstance};
+use super::{callables::LoxCallable, instance::LoxInstanceRef};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LoxValue {
@@ -11,7 +11,7 @@ pub enum LoxValue {
     Number(f64),
     String(String),
     Callable(LoxCallable),
-    Instance(LoxInstance),
+    Instance(LoxInstanceRef),
 }
 
 impl From<&LiteralValue> for LoxValue {
@@ -33,7 +33,7 @@ impl Display for LoxValue {
             LoxValue::Number(val) => write!(f, "{val}"),
             LoxValue::String(val) => write!(f, "{val}"),
             LoxValue::Callable(lox_callable) => write!(f, "{lox_callable}"),
-            LoxValue::Instance(instance) => write!(f, "{instance}"),
+            LoxValue::Instance(instance) => write!(f, "{}", instance.borrow()),
         }
     }
 }
