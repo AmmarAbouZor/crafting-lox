@@ -17,15 +17,18 @@ impl LoxInstance {
     }
 
     pub fn get(&self, name: &Token) -> Result<LoxValue, RuntimeError> {
-        self.fields
-            .get(&name.lexeme)
-            .map(|v| v.to_owned())
-            .ok_or_else(|| {
-                RuntimeError::new(
-                    name.to_owned(),
-                    format!("Undefined property '{}'.", name.lexeme),
-                )
-            })
+        if let Some(value) = self.fields.get(&name.lexeme) {
+            return Ok(value.to_owned());
+        }
+
+        if let Some(method) = self.class.find_method(&name.lexeme) {
+            return Ok(LoxValue::Callable(method.to_owned()));
+        }
+
+        Err(RuntimeError::new(
+            name.to_owned(),
+            format!("Undefined property '{}'.", name.lexeme),
+        ))
     }
 
     pub fn set(&mut self, name: &Token, value: LoxValue) {

@@ -1,5 +1,5 @@
 //TODO: General: Check why we need the types to implement PartialEq
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use callables::{CLOCK_NAME, LoxCallable};
 use class::LoxClass;
@@ -145,7 +145,19 @@ impl Interpreter {
         self.environment
             .borrow_mut()
             .define(name.lexeme.clone(), LoxValue::Nil);
-        let klass = LoxClass::new(name.lexeme.clone());
+
+        let mut meth = HashMap::new();
+
+        for method in methods {
+            let function = LoxCallable::LoxFunction {
+                declaration: method.to_owned(),
+                closure: self.environment.clone(),
+            };
+
+            meth.insert(method.name.lexeme.to_owned(), function);
+        }
+
+        let klass = LoxClass::new(name.lexeme.clone(), meth);
         self.environment
             .borrow_mut()
             .assign(name, LoxValue::Callable(LoxCallable::Class(klass)))?;

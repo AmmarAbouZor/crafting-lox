@@ -16,6 +16,7 @@ type Result<T> = std::result::Result<T, ResolveError>;
 enum FunctionType {
     None,
     Function,
+    Method,
 }
 
 #[derive(Debug)]
@@ -86,12 +87,18 @@ impl<'a> Resolver<'a> {
                 self.resolve_stmt(body)
             }
             Stmt::Block { statements } => self.resolve_block(statements),
-            Stmt::Class { name, methods: _ } => {
-                self.declare(name)?;
-                self.define(name);
-                Ok(())
-            }
+            Stmt::Class { name, methods } => self.resolve_stmt_class(name, methods),
         }
+    }
+
+    fn resolve_stmt_class(&mut self, name: &Token, methods: &[FuncDeclaration]) -> Result<()> {
+        self.declare(name)?;
+        self.define(name);
+
+        for method in methods {
+            self.resolve_function(method, FunctionType::Method)?;
+        }
+        Ok(())
     }
 
     fn visit_stmt_function(&mut self, func_declaration: &FuncDeclaration) -> Result<()> {
@@ -209,14 +216,14 @@ impl<'a> Resolver<'a> {
             Expr::Unary { operator: _, right } => self.resolve_expr(right),
             expr @ Expr::Variable { name } => self.expr_var(expr, name),
             expr @ Expr::Assign { name, value } => self.expr_assign(expr, name, value.as_ref()),
-            Expr::Get { object, name: _ } => self.resolve_expr(&object),
+            Expr::Get { object, name: _ } => self.resolve_expr(object),
             Expr::Set {
                 object,
                 name: _,
                 value,
             } => {
-                self.resolve_expr(&object)?;
-                self.resolve_expr(&value)
+                self.resolve_expr(object)?;
+                self.resolve_expr(value)
             }
         }
     }
