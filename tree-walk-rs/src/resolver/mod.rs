@@ -86,6 +86,11 @@ impl<'a> Resolver<'a> {
                 self.resolve_stmt(body)
             }
             Stmt::Block { statements } => self.resolve_block(statements),
+            Stmt::Class { name, methods: _ } => {
+                self.declare(name)?;
+                self.define(name);
+                Ok(())
+            }
         }
     }
 

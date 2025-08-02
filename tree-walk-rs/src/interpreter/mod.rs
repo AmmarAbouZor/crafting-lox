@@ -1,17 +1,20 @@
 //TODO: General: Check why we need the types to implement PartialEq
 use std::{cell::RefCell, rc::Rc};
 
-use callables::{LoxCallable, CLOCK_NAME};
+use callables::{CLOCK_NAME, LoxCallable};
+use class::LoxClass;
 use error::RuntimeError;
 
 use crate::{
-    ast::{Expr, Stmt},
     Token, TokenType as TT,
+    ast::{Expr, FuncDeclaration, Stmt},
 };
 
 mod callables;
+mod class;
 mod environment;
 pub mod error;
+mod instance;
 mod values;
 
 use environment::{Environment, EnvironmentRef};
@@ -132,7 +135,20 @@ impl Interpreter {
                     value: Box::new(value),
                 });
             }
+            Stmt::Class { name, methods } => self.evaluate_class(name, methods)?,
         };
+
+        Ok(())
+    }
+
+    fn evaluate_class(&mut self, name: &Token, methods: &[FuncDeclaration]) -> Result<()> {
+        self.environment
+            .borrow_mut()
+            .define(name.lexeme.clone(), LoxValue::Nil);
+        let klass = LoxClass::new(name.lexeme.clone());
+        self.environment
+            .borrow_mut()
+            .assign(name, LoxValue::Callable(LoxCallable::Class(klass)))?;
 
         Ok(())
     }

@@ -35,12 +35,15 @@ impl Parser {
 
     /// Definition:
     /// ```text
-    /// declaration → funDecl
+    /// declaration → classDecl
+    ///             | funDecl
     ///             | varDecl
     ///             | statement ;
     /// ```
     fn declaration(&mut self) -> Option<Stmt> {
-        let res = if self.match_then_consume(&[TT::Fun]) {
+        let res = if self.match_then_consume(&[TT::Class]) {
+            self.class_declaration()
+        } else if self.match_then_consume(&[TT::Fun]) {
             self.function_declaration("function")
         } else if self.match_then_consume(&[TT::Var]) {
             self.var_declaration()
@@ -58,6 +61,32 @@ impl Parser {
                 None
             }
         }
+    }
+
+    /// Definition:
+    /// ```text
+    /// classDecl → "class" IDENTIFIER "{" function* "}" ;
+    /// ```
+    fn class_declaration(&mut self) -> Result<Stmt> {
+        let name = self.consume_identifier("Expect class name.")?.to_owned();
+        self.consume(&TT::LeftBrace, "Expect '{' before class body.")?;
+
+        let mut methods = Vec::new();
+
+        while !self.check(&TT::RightBrace) && !self.at_end() {
+            let func = self.function_declaration("method")?;
+            let Stmt::Function(method) = func else {
+                panic!("Function declaration must return function")
+            };
+
+            methods.push(method);
+        }
+
+        self.consume(&TT::RightBrace, "Expect '}' after class body.")?;
+
+        let stmt = Stmt::Class { name, methods };
+
+        Ok(stmt)
     }
 
     /// Definition:

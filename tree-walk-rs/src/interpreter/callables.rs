@@ -4,7 +4,9 @@ use crate::{RuntimeError, Token, TokenType, ast::FuncDeclaration};
 
 use super::{
     Interpreter, LoxValue,
+    class::LoxClass,
     environment::{Environment, EnvironmentRef},
+    instance::LoxInstance,
 };
 
 type Result<T> = std::result::Result<T, RuntimeError>;
@@ -20,6 +22,7 @@ pub enum LoxCallable {
         declaration: FuncDeclaration,
         closure: EnvironmentRef,
     },
+    Class(LoxClass),
 }
 
 impl LoxCallable {
@@ -30,6 +33,10 @@ impl LoxCallable {
                 declaration,
                 closure,
             } => Self::call_function(declaration, interprerter, arguments, closure.clone()),
+            LoxCallable::Class(lox_class) => {
+                let instance = LoxInstance::new(lox_class.to_owned());
+                Ok(LoxValue::Instance(instance))
+            }
         }
     }
 
@@ -40,6 +47,7 @@ impl LoxCallable {
                 declaration,
                 closure: _,
             } => declaration.params.len(),
+            LoxCallable::Class(_lox_class) => 0,
         }
     }
 
@@ -86,6 +94,9 @@ impl Display for LoxCallable {
                 closure: _,
             } => {
                 write!(f, "<fn {}>", declaration.name.lexeme)
+            }
+            LoxCallable::Class(lox_class) => {
+                write!(f, "{lox_class}")
             }
         }
     }
