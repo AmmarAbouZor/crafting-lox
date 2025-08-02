@@ -106,21 +106,18 @@ impl<'a> Resolver<'a> {
         self.current_function = typ;
 
         self.begin_scope();
+
+        let mut sel = scopeguard::guard(self, |s| {
+            s.end_scope();
+            s.current_function = enclosing_fun;
+        });
+
         for param in &func_declaration.params {
-            if let Err(err) = self.declare(param) {
-                self.end_scope();
-                self.current_function = enclosing_fun;
-
-                return Err(err);
-            }
-            self.define(param);
+            sel.declare(param)?;
+            sel.define(param);
         }
-        let resolve_res = self.resolve_stmts(&func_declaration.body);
-        self.end_scope();
 
-        self.current_function = enclosing_fun;
-
-        resolve_res
+        sel.resolve_stmts(&func_declaration.body)
     }
 
     fn resolve_var(&mut self, name: &Token, initializer: Option<&Expr>) -> Result<()> {

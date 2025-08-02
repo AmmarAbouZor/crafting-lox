@@ -1,12 +1,12 @@
 //TODO: General: Check why we need the types to implement PartialEq
 use std::{cell::RefCell, rc::Rc};
 
-use callables::{CLOCK_NAME, LoxCallable};
+use callables::{LoxCallable, CLOCK_NAME};
 use error::RuntimeError;
 
 use crate::{
-    Token, TokenType as TT,
     ast::{Expr, Stmt},
+    Token, TokenType as TT,
 };
 
 mod callables;
@@ -142,14 +142,13 @@ impl Interpreter {
 
         self.environment = environment;
 
-        for stmt in statements {
-            if let Err(err) = self.execute(stmt) {
-                self.environment = prev_env;
-                return Err(err);
-            }
-        }
+        let mut sel = scopeguard::guard(self, |s| {
+            s.environment = prev_env;
+        });
 
-        self.environment = prev_env;
+        for stmt in statements {
+            sel.execute(stmt)?;
+        }
 
         Ok(())
     }

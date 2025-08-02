@@ -6,6 +6,7 @@ description = "Implementation of a tree walk interpreter for LOX language ported
 
 [dependencies]
 anyhow = "1"
+scopeguard = "1"
 thiserror = "2"
 
 [[bin]]
