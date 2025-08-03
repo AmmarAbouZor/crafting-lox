@@ -29,6 +29,9 @@ pub enum Stmt {
     },
     Class {
         name: Token,
+        //NOTE: In the book it says that this is an `Expr::Var`
+        // Since `Expr::Var = {name: Token}` I used the name as super_class
+        super_class: Option<Token>,
         methods: Vec<FuncDeclaration>,
     },
 }

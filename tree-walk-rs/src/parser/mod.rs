@@ -65,10 +65,19 @@ impl Parser {
 
     /// Definition:
     /// ```text
-    /// classDecl → "class" IDENTIFIER "{" function* "}" ;
+    /// classDecl → "class" IDENTIFIER ( "<" IDENTIFIER )?
+    ///             "{" function* "}" ;
     /// ```
     fn class_declaration(&mut self) -> Result<Stmt> {
         let name = self.consume_identifier("Expect class name.")?.to_owned();
+
+        let super_class = if self.match_then_consume(&[TT::Less]) {
+            let name = self.consume_identifier("Expect superclass name")?;
+            Some(name.to_owned())
+        } else {
+            None
+        };
+
         self.consume(&TT::LeftBrace, "Expect '{' before class body.")?;
 
         let mut methods = Vec::new();
@@ -84,7 +93,11 @@ impl Parser {
 
         self.consume(&TT::RightBrace, "Expect '}' after class body.")?;
 
-        let stmt = Stmt::Class { name, methods };
+        let stmt = Stmt::Class {
+            name,
+            super_class,
+            methods,
+        };
 
         Ok(stmt)
     }
@@ -624,8 +637,9 @@ impl Parser {
 
     /// Definition:
     /// ```text
-    /// primary  → NUMBER | STRING | "true" | "false" | "nil"
-    ///          | "(" expression ")" ;
+    // primary → "true" | "false" | "nil" | "this"
+    //         | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+    //         | "super" "." IDENTIFIER ;
     /// ```
     pub fn primary(&mut self) -> Result<Expr> {
         let token = self.advance();
@@ -658,6 +672,14 @@ impl Parser {
             TT::Identifier(..) => Expr::Variable {
                 name: token.to_owned(),
             },
+            TT::Super => {
+                let keyword = self.previous().to_owned();
+                self.consume(&TT::Dot, "Expect '.' after 'super'.")?;
+                let method = self
+                    .consume_identifier("Expect superclass method name.")?
+                    .to_owned();
+                Expr::Super { keyword, method }
+            }
             unexpected => {
                 return Err(ParseError::new(
                     self.peek().to_owned(),

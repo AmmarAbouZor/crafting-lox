@@ -6,7 +6,7 @@ pub type EnvironmentRef = Rc<RefCell<Environment>>;
 
 #[derive(Debug, Default, PartialEq)]
 pub struct Environment {
-    enclosing: Option<EnvironmentRef>,
+    pub enclosing: Option<EnvironmentRef>,
     values: HashMap<String, LoxValue>,
 }
 

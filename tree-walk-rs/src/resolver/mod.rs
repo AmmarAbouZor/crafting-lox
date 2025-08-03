@@ -24,6 +24,7 @@ enum FunctionType {
 enum ClassType {
     None,
     Class,
+    SubClass,
 }
 
 #[derive(Debug)]
@@ -85,7 +86,11 @@ impl<'a> Resolver<'a> {
                 self.resolve_stmt(body)
             }
             Stmt::Block { statements } => self.resolve_block(statements),
-            Stmt::Class { name, methods } => self.resolve_stmt_class(name, methods),
+            Stmt::Class {
+                name,
+                super_class,
+                methods,
+            } => self.resolve_stmt_class(name, super_class.as_ref(), methods),
         }
     }
 
@@ -108,20 +113,49 @@ impl<'a> Resolver<'a> {
         Ok(())
     }
 
-    fn resolve_stmt_class(&mut self, name: &Token, methods: &[FuncDeclaration]) -> Result<()> {
+    fn resolve_stmt_class(
+        &mut self,
+        name: &Token,
+        super_class: Option<&Token>,
+        methods: &[FuncDeclaration],
+    ) -> Result<()> {
         let enclusing_class = self.current_class;
         self.current_class = ClassType::Class;
 
-        if let Err(err) = self.declare(name) {
-            self.current_class = enclusing_class;
-            return Err(err);
-        }
-        self.define(name);
-
-        self.begin_scope();
         let mut s = scopeguard::guard(self, |s| {
-            s.end_scope();
             s.current_class = enclusing_class;
+        });
+
+        s.declare(name)?;
+        s.define(name);
+
+        if let Some(super_class) = super_class {
+            // class Foo < Foo {...}
+            if name.lexeme == super_class.lexeme {
+                return Err(ResolveError::new(
+                    super_class.to_owned(),
+                    "A class can't inherit from itself.",
+                ));
+            }
+
+            s.current_class = ClassType::SubClass;
+
+            // Resolve
+            s.resolve_expr(&Expr::Variable {
+                name: super_class.to_owned(),
+            })?;
+
+            // Set scope for super
+            s.begin_scope();
+            s.scopes.last_mut().unwrap().insert("super".into(), true);
+        }
+
+        s.begin_scope();
+        let mut s = scopeguard::guard(s, |mut s| {
+            s.end_scope();
+            if super_class.is_some() {
+                s.end_scope();
+            }
         });
 
         s.scopes.last_mut().unwrap().insert("this".into(), true);
@@ -268,6 +302,25 @@ impl<'a> Resolver<'a> {
                         keyword.to_owned(),
                         "Can't use 'this' outside of a class.",
                     ));
+                }
+                self.resolve_local(expr, keyword);
+                Ok(())
+            }
+            expr @ Expr::Super { keyword, method: _ } => {
+                match self.current_class {
+                    ClassType::None => {
+                        return Err(ResolveError::new(
+                            keyword.to_owned(),
+                            "Can't use 'super' outside of a class",
+                        ));
+                    }
+                    ClassType::SubClass => {}
+                    ClassType::Class => {
+                        return Err(ResolveError::new(
+                            keyword.to_owned(),
+                            "Can't use 'super' in a class with no superclass",
+                        ));
+                    }
                 }
                 self.resolve_local(expr, keyword);
                 Ok(())

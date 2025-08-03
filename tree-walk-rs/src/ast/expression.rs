@@ -39,6 +39,10 @@ pub enum Expr {
         name: Token,
         value: Box<Expr>,
     },
+    Super {
+        keyword: Token,
+        method: Token,
+    },
     This {
         keyword: Token,
     },
@@ -106,6 +110,7 @@ impl Expr {
                 value,
             } => parenthesize(format!("Set {name}").as_str(), &[object, value]),
             Expr::This { keyword } => String::from("This"),
+            Expr::Super { keyword, method } => format!("super.{}", method.lexeme),
         }
     }
 }

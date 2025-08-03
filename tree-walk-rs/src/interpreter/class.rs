@@ -2,21 +2,41 @@ use std::{collections::HashMap, fmt::Display};
 
 use crate::{RuntimeError, interpreter::instance::LoxInstance};
 
-use super::{Interpreter, LoxValue, function::LoxFunction};
+use super::{Interpreter, LoxValue, callables::LoxClassRef, function::LoxFunction};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoxClass {
     name: String,
     methods: HashMap<String, LoxFunction>,
+    super_class: Option<Box<LoxClassRef>>,
 }
 
 impl LoxClass {
-    pub fn new(name: String, methods: HashMap<String, LoxFunction>) -> Self {
-        Self { name, methods }
+    pub fn new(
+        name: String,
+        methods: HashMap<String, LoxFunction>,
+        super_class: Option<LoxClassRef>,
+    ) -> Self {
+        let super_class = super_class.map(Box::new);
+        Self {
+            name,
+            methods,
+            super_class,
+        }
     }
 
-    pub fn find_method(&self, name: &str) -> Option<&LoxFunction> {
-        self.methods.get(name)
+    pub fn find_method(&self, name: &str) -> Option<LoxFunction> {
+        if let Some(method) = self.methods.get(name) {
+            return Some(method.to_owned());
+        }
+
+        if let Some(super_c) = self.super_class.as_ref()
+            && let Some(method) = super_c.borrow().find_method(name)
+        {
+            return Some(method);
+        }
+
+        None
     }
 
     pub fn call(

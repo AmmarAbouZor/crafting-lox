@@ -137,28 +137,71 @@ impl Interpreter {
                     value: Box::new(value),
                 });
             }
-            Stmt::Class { name, methods } => self.evaluate_class(name, methods)?,
+            Stmt::Class {
+                name,
+                super_class,
+                methods,
+            } => self.evaluate_class(name, super_class.as_ref(), methods)?,
         };
 
         Ok(())
     }
 
-    fn evaluate_class(&mut self, name: &Token, methods: &[FuncDeclaration]) -> Result<()> {
+    fn evaluate_class(
+        &mut self,
+        name: &Token,
+        super_class: Option<&Token>,
+        methods: &[FuncDeclaration],
+    ) -> Result<()> {
+        let super_class = if let Some(super_class) = super_class {
+            let class = self.evaluate(&Expr::Variable {
+                name: super_class.to_owned(),
+            })?;
+            match class {
+                LoxValue::Callable(LoxCallable::Class(class)) => Some(class),
+                _ => {
+                    return Err(RuntimeError::new(
+                        super_class.to_owned(),
+                        "Superclass must be a class.",
+                    ));
+                }
+            }
+        } else {
+            None
+        };
+
         self.environment
             .borrow_mut()
             .define(name.lexeme.clone(), LoxValue::Nil);
+
+        if let Some(super_class) = super_class.clone() {
+            self.environment = Environment::with_enclosing(self.environment.clone());
+            self.environment.borrow_mut().define(
+                "super".into(),
+                LoxValue::Callable(LoxCallable::Class(super_class)),
+            );
+        }
+
+        let has_super = super_class.is_some();
+        let s = scopeguard::guard(self, |s| {
+            if has_super {
+                let enclosing = s.environment.borrow().enclosing.as_ref().unwrap().clone();
+                s.environment = enclosing;
+            }
+        });
 
         let mut meth = HashMap::new();
 
         for method in methods {
             let is_initializer = method.name.lexeme == "init";
             let function =
-                LoxFunction::new(method.to_owned(), self.environment.clone(), is_initializer);
+                LoxFunction::new(method.to_owned(), s.environment.clone(), is_initializer);
             meth.insert(method.name.lexeme.to_owned(), function);
         }
 
-        let klass = LoxClass::new(name.lexeme.clone(), meth);
-        self.environment
+        let klass = LoxClass::new(name.lexeme.clone(), meth, super_class);
+        let klass = Rc::new(RefCell::new(klass));
+        s.environment
             .borrow_mut()
             .assign(name, LoxValue::Callable(LoxCallable::Class(klass)))?;
 
@@ -210,7 +253,39 @@ impl Interpreter {
                 value,
             } => self.evaluate_set(object, name, value),
             expr @ Expr::This { keyword } => self.lookup_variable(expr, keyword),
+            expr @ Expr::Super { keyword: _, method } => self.evaluate_super(expr, method),
         }
+    }
+
+    fn evaluate_super(&mut self, expr: &Expr, method: &Token) -> Result<LoxValue> {
+        let distance = self
+            .get_distance(expr)
+            .expect("Superclass is registered in resolver");
+
+        let super_value = Environment::get_at(self.environment.clone(), distance, "super");
+        let super_class = match &super_value {
+            LoxValue::Callable(LoxCallable::Class(klass)) => klass,
+            _ => panic!("We must get class when asking fro 'super'"),
+        };
+
+        let this_instance = Environment::get_at(self.environment.clone(), distance - 1, "this");
+        let this_instance = match this_instance {
+            LoxValue::Instance(inst) => inst,
+            _ => panic!("We must get instance when asking for 'this'"),
+        };
+
+        let method = super_class
+            .borrow()
+            .find_method(&method.lexeme)
+            .ok_or_else(|| {
+                RuntimeError::new(
+                    method.to_owned(),
+                    format!("Undefined property '{}'.", method.lexeme),
+                )
+            })?;
+
+        let method = method.bind(this_instance);
+        Ok(LoxValue::Callable(LoxCallable::LoxFunction(method)))
     }
 
     fn evaluate_get(&mut self, object: &Expr, name: &Token) -> Result<LoxValue> {
