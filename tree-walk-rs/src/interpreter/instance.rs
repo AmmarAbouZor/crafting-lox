@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
-use crate::{RuntimeError, Token};
+use crate::{Token, errors::LoxError};
 
 use super::{LoxValue, callables::LoxCallable, class::LoxClass};
 
@@ -19,7 +19,7 @@ impl LoxInstance {
         Rc::new(RefCell::new(instance))
     }
 
-    pub fn get(inst_ref: LoxInstanceRef, name: &Token) -> Result<LoxValue, RuntimeError> {
+    pub fn get(inst_ref: LoxInstanceRef, name: &Token) -> Result<LoxValue, LoxError> {
         let instance = inst_ref.borrow();
         if let Some(value) = instance.fields.get(&name.lexeme) {
             return Ok(value.to_owned());
@@ -30,7 +30,7 @@ impl LoxInstance {
             return Ok(LoxValue::Callable(LoxCallable::LoxFunction(func)));
         }
 
-        Err(RuntimeError::new(
+        Err(LoxError::new(
             name.to_owned(),
             format!("Undefined property '{}'.", name.lexeme),
         ))

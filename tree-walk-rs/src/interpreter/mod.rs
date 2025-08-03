@@ -1,29 +1,25 @@
-//TODO: General: Check why we need the types to implement PartialEq
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use callables::{CLOCK_NAME, LoxCallable};
 use class::LoxClass;
-use error::RuntimeError;
 use function::LoxFunction;
 use instance::LoxInstance;
 
 use crate::{
     Token, TokenType as TT,
     ast::{Expr, FuncDeclaration, Stmt},
+    errors::{LoxError, LoxResult},
 };
 
 mod callables;
 mod class;
 mod environment;
-pub mod error;
 mod function;
 mod instance;
 mod values;
 
 use environment::{Environment, EnvironmentRef};
 pub use values::LoxValue;
-
-type Result<T> = std::result::Result<T, RuntimeError>;
 
 #[derive(Debug)]
 pub struct Interpreter {
@@ -71,7 +67,7 @@ impl Interpreter {
         }
     }
 
-    fn execute(&mut self, stmt: &Stmt) -> Result<()> {
+    fn execute(&mut self, stmt: &Stmt) -> LoxResult<()> {
         match stmt {
             Stmt::Expression(expr) => {
                 // Expression on their own doesn't need the evaluated
@@ -133,7 +129,7 @@ impl Interpreter {
                 };
 
                 // Misuse of errors since they will bubble up the call stack
-                return Err(RuntimeError::Return {
+                return Err(LoxError::Return {
                     value: Box::new(value),
                 });
             }
@@ -152,7 +148,7 @@ impl Interpreter {
         name: &Token,
         super_class: Option<&Token>,
         methods: &[FuncDeclaration],
-    ) -> Result<()> {
+    ) -> LoxResult<()> {
         let super_class = if let Some(super_class) = super_class {
             let class = self.evaluate(&Expr::Variable {
                 name: super_class.to_owned(),
@@ -160,7 +156,7 @@ impl Interpreter {
             match class {
                 LoxValue::Callable(LoxCallable::Class(class)) => Some(class),
                 _ => {
-                    return Err(RuntimeError::new(
+                    return Err(LoxError::new(
                         super_class.to_owned(),
                         "Superclass must be a class.",
                     ));
@@ -208,7 +204,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn execute_block(&mut self, statements: &[Stmt], environment: EnvironmentRef) -> Result<()> {
+    fn execute_block(&mut self, statements: &[Stmt], environment: EnvironmentRef) -> LoxResult<()> {
         let prev_env = self.environment.clone();
 
         self.environment = environment;
@@ -224,7 +220,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn evaluate(&mut self, expr: &Expr) -> Result<LoxValue> {
+    fn evaluate(&mut self, expr: &Expr) -> LoxResult<LoxValue> {
         match expr {
             Expr::Grouping { expression } => self.evaluate(expression),
             Expr::Literal { value } => Ok(value.into()),
@@ -257,7 +253,7 @@ impl Interpreter {
         }
     }
 
-    fn evaluate_super(&mut self, expr: &Expr, method: &Token) -> Result<LoxValue> {
+    fn evaluate_super(&mut self, expr: &Expr, method: &Token) -> LoxResult<LoxValue> {
         let distance = self
             .get_distance(expr)
             .expect("Superclass is registered in resolver");
@@ -278,7 +274,7 @@ impl Interpreter {
             .borrow()
             .find_method(&method.lexeme)
             .ok_or_else(|| {
-                RuntimeError::new(
+                LoxError::new(
                     method.to_owned(),
                     format!("Undefined property '{}'.", method.lexeme),
                 )
@@ -288,20 +284,20 @@ impl Interpreter {
         Ok(LoxValue::Callable(LoxCallable::LoxFunction(method)))
     }
 
-    fn evaluate_get(&mut self, object: &Expr, name: &Token) -> Result<LoxValue> {
+    fn evaluate_get(&mut self, object: &Expr, name: &Token) -> LoxResult<LoxValue> {
         match self.evaluate(object)? {
             LoxValue::Instance(lox_instance) => LoxInstance::get(lox_instance, name),
-            _ => Err(RuntimeError::new(
+            _ => Err(LoxError::new(
                 name.to_owned(),
                 "Only instances have properties.",
             )),
         }
     }
 
-    fn evaluate_set(&mut self, object: &Expr, name: &Token, value: &Expr) -> Result<LoxValue> {
+    fn evaluate_set(&mut self, object: &Expr, name: &Token, value: &Expr) -> LoxResult<LoxValue> {
         let object = self.evaluate(object)?;
         let LoxValue::Instance(instance) = object else {
-            return Err(RuntimeError::new(
+            return Err(LoxError::new(
                 name.to_owned(),
                 "Only instances have fields.",
             ));
@@ -313,7 +309,7 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn lookup_variable(&mut self, main_expr: &Expr, name: &Token) -> Result<LoxValue> {
+    fn lookup_variable(&mut self, main_expr: &Expr, name: &Token) -> LoxResult<LoxValue> {
         let distance = self.get_distance(main_expr);
         if let Some(dist) = distance {
             let val = Environment::get_at(self.environment.clone(), dist, &name.lexeme);
@@ -330,7 +326,7 @@ impl Interpreter {
             .map(|(_, depth)| *depth)
     }
 
-    fn assign_expr(&mut self, main_exp: &Expr, name: &Token, value: &Expr) -> Result<LoxValue> {
+    fn assign_expr(&mut self, main_exp: &Expr, name: &Token, value: &Expr) -> LoxResult<LoxValue> {
         let value = self.evaluate(value)?;
         let dist = self.get_distance(main_exp);
         if let Some(distance) = dist {
@@ -347,7 +343,7 @@ impl Interpreter {
         callee: &Expr,
         paren: &Token,
         arguments: &[Expr],
-    ) -> Result<LoxValue> {
+    ) -> LoxResult<LoxValue> {
         let callee = self.evaluate(callee)?;
         let mut args = Vec::with_capacity(arguments.len());
         for arg in arguments {
@@ -357,7 +353,7 @@ impl Interpreter {
         let callee = match callee {
             LoxValue::Callable(lox_callable) => lox_callable,
             _ => {
-                return Err(RuntimeError::new(
+                return Err(LoxError::new(
                     paren.to_owned(),
                     "Can only call functions and classes.",
                 ));
@@ -365,7 +361,7 @@ impl Interpreter {
         };
 
         if callee.arity() != args.len() {
-            return Err(RuntimeError::new(
+            return Err(LoxError::new(
                 paren.to_owned(),
                 format!(
                     "Expected {} arguments but got {}.",
@@ -378,13 +374,13 @@ impl Interpreter {
         callee.call(self, &args)
     }
 
-    fn evaluate_unary(&mut self, operator: &Token, right: &Expr) -> Result<LoxValue> {
+    fn evaluate_unary(&mut self, operator: &Token, right: &Expr) -> LoxResult<LoxValue> {
         let right = self.evaluate(right)?;
         let value = match (right, &operator.typ) {
             // Minus
             (LoxValue::Number(num), TT::Minus) => LoxValue::Number(-num),
             (_, TT::Minus) => {
-                let err = RuntimeError::new(operator.to_owned(), "Operand must be number.");
+                let err = LoxError::new(operator.to_owned(), "Operand must be number.");
                 return Err(err);
             }
 
@@ -400,7 +396,12 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn evaluate_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> Result<LoxValue> {
+    fn evaluate_binary(
+        &mut self,
+        left: &Expr,
+        operator: &Token,
+        right: &Expr,
+    ) -> LoxResult<LoxValue> {
         use LoxValue as V;
         let left = self.evaluate(left)?;
         let right = self.evaluate(right)?;
@@ -415,7 +416,7 @@ impl Interpreter {
             (V::Number(left), TT::Plus, V::Number(right)) => V::Number(left + right),
             (V::String(left), TT::Plus, V::String(right)) => V::String(format!("{left}{right}")),
             (_, TT::Plus, _) => {
-                let err = RuntimeError::new(
+                let err = LoxError::new(
                     operator.to_owned(),
                     "Operands must be two numbers or two Strings",
                 );
@@ -440,7 +441,7 @@ impl Interpreter {
                 | TT::LessEqual,
                 _,
             ) => {
-                let err = RuntimeError::new(operator.to_owned(), "Operands must be numbers");
+                let err = LoxError::new(operator.to_owned(), "Operands must be numbers");
 
                 return Err(err);
             }
@@ -463,7 +464,7 @@ impl Interpreter {
         left: &Expr,
         operator: &Token,
         right: &Expr,
-    ) -> Result<LoxValue> {
+    ) -> LoxResult<LoxValue> {
         // Evaluate left first and only execute right if logical expand to it.
         // This is necessary to avoid any side effect from executing right.
 

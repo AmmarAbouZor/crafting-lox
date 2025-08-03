@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{RuntimeError, ast::FuncDeclaration};
+use crate::{ast::FuncDeclaration, errors::LoxError};
 
 use super::{
     Interpreter, LoxValue,
@@ -36,7 +36,7 @@ impl LoxFunction {
         &self,
         interprerter: &mut Interpreter,
         arguments: &[LoxValue],
-    ) -> Result<LoxValue, RuntimeError> {
+    ) -> Result<LoxValue, LoxError> {
         let environment = Environment::with_enclosing(self.closure.clone());
         let mut env_borrow = environment.borrow_mut();
         for (arg, param) in arguments.iter().zip(self.declaration.params.iter()) {
@@ -53,7 +53,7 @@ impl LoxFunction {
                 };
                 Ok(value)
             }
-            Err(RuntimeError::Return { value }) => {
+            Err(LoxError::Return { value }) => {
                 let value = if self.is_initializer {
                     Environment::get_at(self.closure.clone(), 0, "this")
                 } else {

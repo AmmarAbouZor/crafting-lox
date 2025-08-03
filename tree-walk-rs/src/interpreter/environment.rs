@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{LoxValue, RuntimeError, Token};
+use crate::{LoxValue, Token, errors::LoxError};
 
 pub type EnvironmentRef = Rc<RefCell<Environment>>;
 
@@ -24,7 +24,7 @@ impl Environment {
         self.values.insert(key, value);
     }
 
-    pub fn get(&self, name: &Token) -> Result<LoxValue, RuntimeError> {
+    pub fn get(&self, name: &Token) -> Result<LoxValue, LoxError> {
         if let Some(val) = self.values.get(&name.lexeme) {
             return Ok(val.to_owned());
         }
@@ -33,7 +33,7 @@ impl Environment {
             return enclosing.borrow().get(name);
         }
 
-        Err(RuntimeError::new(
+        Err(LoxError::new(
             name.to_owned(),
             format!("Undefined variable '{}'.", name.lexeme),
         ))
@@ -63,7 +63,7 @@ impl Environment {
         env
     }
 
-    pub fn assign(&mut self, name: &Token, value: LoxValue) -> Result<(), RuntimeError> {
+    pub fn assign(&mut self, name: &Token, value: LoxValue) -> Result<(), LoxError> {
         if let Some(old_val) = self.values.get_mut(&name.lexeme) {
             *old_val = value;
             return Ok(());
@@ -73,7 +73,7 @@ impl Environment {
             return enclosing.borrow_mut().assign(name, value);
         }
 
-        Err(RuntimeError::new(
+        Err(LoxError::new(
             name.to_owned(),
             format!("Undefined variable '{}'.", name.lexeme),
         ))

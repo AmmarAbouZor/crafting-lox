@@ -1,13 +1,8 @@
-use error::ParseError;
-
 use crate::{
     Token, TokenType as TT,
     ast::{Expr, FuncDeclaration, LiteralValue, Stmt},
+    errors::{LoxError, LoxResult},
 };
-
-type Result<T> = std::result::Result<T, error::ParseError>;
-
-pub mod error;
 
 const MAX_ARGS_COUNT: usize = 255;
 
@@ -22,7 +17,7 @@ impl Parser {
         Self { tokens, current: 0 }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>> {
+    pub fn parse(&mut self) -> LoxResult<Vec<Stmt>> {
         let mut stmts = Vec::new();
         while !self.at_end() {
             if let Some(stmt) = self.declaration() {
@@ -68,7 +63,7 @@ impl Parser {
     /// classDecl → "class" IDENTIFIER ( "<" IDENTIFIER )?
     ///             "{" function* "}" ;
     /// ```
-    fn class_declaration(&mut self) -> Result<Stmt> {
+    fn class_declaration(&mut self) -> LoxResult<Stmt> {
         let name = self.consume_identifier("Expect class name.")?.to_owned();
 
         let super_class = if self.match_then_consume(&[TT::Less]) {
@@ -108,7 +103,7 @@ impl Parser {
     /// function    → IDENTIFIER "(" parameters? ")" block ;
     /// parameters  → IDENTIFIER ( "," IDENTIFIER )* ;
     /// ```
-    fn function_declaration(&mut self, kind: &str) -> Result<Stmt> {
+    fn function_declaration(&mut self, kind: &str) -> LoxResult<Stmt> {
         // Name:
         let name = self
             .consume_identifier(format!("Expect {kind} name."))?
@@ -122,7 +117,7 @@ impl Parser {
         if !self.check(&TT::RightParen) {
             loop {
                 if params.len() > MAX_ARGS_COUNT {
-                    return Err(ParseError::new(
+                    return Err(LoxError::new(
                         self.peek().to_owned(),
                         format!("Can't have more than {MAX_ARGS_COUNT} parameters."),
                     ));
@@ -151,7 +146,7 @@ impl Parser {
         Ok(stmt)
     }
 
-    fn var_declaration(&mut self) -> Result<Stmt> {
+    fn var_declaration(&mut self) -> LoxResult<Stmt> {
         let name = self.consume_identifier("Expect variable name")?.to_owned();
 
         let initializer = if self.match_then_consume(&[TT::Equal]) {
@@ -177,7 +172,7 @@ impl Parser {
     ///           | whileStmt
     ///           | block ;
     /// ```
-    fn statement(&mut self) -> Result<Stmt> {
+    fn statement(&mut self) -> LoxResult<Stmt> {
         if self.match_then_consume(&[TT::For]) {
             return self.for_statement();
         }
@@ -209,7 +204,7 @@ impl Parser {
     /// ifStmt  → "if" "(" expression ")" statement
     ///         ( "else" statement )? ;
     /// ```
-    fn if_statement(&mut self) -> Result<Stmt> {
+    fn if_statement(&mut self) -> LoxResult<Stmt> {
         self.consume(&TT::LeftParen, "Expect '(' after 'if'")?;
         let condition = self.expression()?;
         self.consume(&TT::RightParen, "Expect ')' after condition")?;
@@ -238,7 +233,7 @@ impl Parser {
     ///           expression? ";"
     ///           expression? ")" statement ;
     /// ```
-    fn for_statement(&mut self) -> Result<Stmt> {
+    fn for_statement(&mut self) -> LoxResult<Stmt> {
         // NOTE:
         // TWe will desugar the for loop into while loop
         // To be honest: I don't like this solution. I would rather have a clear
@@ -295,7 +290,7 @@ impl Parser {
         Ok(body)
     }
 
-    fn block(&mut self) -> Result<Vec<Stmt>> {
+    fn block(&mut self) -> LoxResult<Vec<Stmt>> {
         let mut stmts = Vec::new();
         while !self.check(&TT::RightBrace) && !self.at_end() {
             // TODO: Error handling doesn't feel correct here.
@@ -314,7 +309,7 @@ impl Parser {
     /// ```text
     /// printStmt → "print" expression ";" ;
     /// ```
-    fn print_statement(&mut self) -> Result<Stmt> {
+    fn print_statement(&mut self) -> LoxResult<Stmt> {
         let expr = self.expression()?;
         self.consume(&TT::SemiColon, "Expect ';' after value.")?;
 
@@ -327,7 +322,7 @@ impl Parser {
     /// ```text
     // returnStmt → "return" expression? ";" ;
     /// ```
-    fn return_statement(&mut self) -> Result<Stmt> {
+    fn return_statement(&mut self) -> LoxResult<Stmt> {
         let keyword = self.previous().to_owned();
         let value = if self.check(&TT::SemiColon) {
             None
@@ -349,7 +344,7 @@ impl Parser {
     /// ```text
     /// whileStmt → "while" "(" expression ")" statement ;
     /// ```
-    fn while_statement(&mut self) -> Result<Stmt> {
+    fn while_statement(&mut self) -> LoxResult<Stmt> {
         self.consume(&TT::LeftParen, "Expect '(' after while.")?;
         let condition = self.expression()?;
         self.consume(&TT::RightParen, "Expect ')' after condition.")?;
@@ -363,7 +358,7 @@ impl Parser {
         Ok(stmt)
     }
 
-    fn expr_statement(&mut self) -> Result<Stmt> {
+    fn expr_statement(&mut self) -> LoxResult<Stmt> {
         let expr = self.expression()?;
         self.consume(&TT::SemiColon, "Expect ';' after expression.")?;
 
@@ -373,7 +368,7 @@ impl Parser {
     }
 
     /// Definition: `expression → assignment;`
-    pub fn expression(&mut self) -> Result<Expr> {
+    pub fn expression(&mut self) -> LoxResult<Expr> {
         self.assignment()
     }
 
@@ -382,7 +377,7 @@ impl Parser {
     /// assignment → (call ".")? IDENTIFIER "=" assignment
     ///            | logic_or ;
     /// ```
-    fn assignment(&mut self) -> Result<Expr> {
+    fn assignment(&mut self) -> LoxResult<Expr> {
         // L-Value
         let expr = self.or()?;
         if self.match_then_consume(&[TT::Equal]) {
@@ -407,7 +402,7 @@ impl Parser {
                 }
                 _ => {
                     let equals = self.previous().to_owned();
-                    return Err(ParseError::new(equals, "Invalid assignment target."));
+                    return Err(LoxError::new(equals, "Invalid assignment target."));
                 }
             }
         }
@@ -419,7 +414,7 @@ impl Parser {
     /// ```text
     /// logic_or → logic_and ( "or" logic_and )* ;
     /// ```
-    fn or(&mut self) -> Result<Expr> {
+    fn or(&mut self) -> LoxResult<Expr> {
         let mut expr = self.and()?;
 
         while self.match_then_consume(&[TT::Or]) {
@@ -439,7 +434,7 @@ impl Parser {
     /// ```text
     /// logic_and → equality ( "and" equality )* ;
     /// ```
-    fn and(&mut self) -> Result<Expr> {
+    fn and(&mut self) -> LoxResult<Expr> {
         let mut expr = self.equality()?;
 
         while self.match_then_consume(&[TT::And]) {
@@ -456,7 +451,7 @@ impl Parser {
     }
 
     /// Definition: `equality → comparison ( ( "!=" | "==" ) comparison )* ;`
-    pub fn equality(&mut self) -> Result<Expr> {
+    pub fn equality(&mut self) -> LoxResult<Expr> {
         let mut expr = self.comparison()?;
         while self.match_then_consume(&[TT::BangEqual, TT::EqualEqual]) {
             let operator = self.previous().to_owned();
@@ -506,7 +501,7 @@ impl Parser {
     }
 
     /// Definition: `comparison → term ( ( ">" | ">=" | "<" | "<=" ) term )*`
-    pub fn comparison(&mut self) -> Result<Expr> {
+    pub fn comparison(&mut self) -> LoxResult<Expr> {
         let mut expr = self.term()?;
 
         while self.match_then_consume(&[TT::Greater, TT::GreaterEqual, TT::Less, TT::LessEqual]) {
@@ -523,7 +518,7 @@ impl Parser {
     }
 
     /// Definition: `term → factor ( ( "-" | "+" ) factor )*;`
-    pub fn term(&mut self) -> Result<Expr> {
+    pub fn term(&mut self) -> LoxResult<Expr> {
         let mut expr = self.factor()?;
 
         while self.match_then_consume(&[TT::Plus, TT::Minus]) {
@@ -540,7 +535,7 @@ impl Parser {
     }
 
     /// Definition: `factor → unary ( ( "/" | "*" ) unary )*`
-    pub fn factor(&mut self) -> Result<Expr> {
+    pub fn factor(&mut self) -> LoxResult<Expr> {
         let mut expr = self.unary()?;
 
         while self.match_then_consume(&[TT::Slash, TT::Star]) {
@@ -561,7 +556,7 @@ impl Parser {
     /// unary  → ( "!" | "-" ) unary
     ///        | call ;
     /// ```
-    pub fn unary(&mut self) -> Result<Expr> {
+    pub fn unary(&mut self) -> LoxResult<Expr> {
         if self.match_then_consume(&[TT::Bang, TT::Minus]) {
             let operator = self.previous().to_owned();
             let right = self.unary()?;
@@ -581,7 +576,7 @@ impl Parser {
     /// call      → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
     /// arguments → expression ( "," expression )* ;
     /// ```
-    pub fn call(&mut self) -> Result<Expr> {
+    pub fn call(&mut self) -> LoxResult<Expr> {
         let mut expr = self.primary()?;
 
         loop {
@@ -603,13 +598,13 @@ impl Parser {
         Ok(expr)
     }
 
-    fn finish_call(&mut self, callee: Expr) -> Result<Expr> {
+    fn finish_call(&mut self, callee: Expr) -> LoxResult<Expr> {
         let mut arguments = Vec::new();
         if !self.check(&TT::RightParen) {
             loop {
                 if arguments.len() >= MAX_ARGS_COUNT {
                     let current_token = self.peek().to_owned();
-                    return Err(ParseError::new(
+                    return Err(LoxError::new(
                         current_token,
                         format!("Can't have more than {MAX_ARGS_COUNT} arguments."),
                     ));
@@ -641,7 +636,7 @@ impl Parser {
     //         | NUMBER | STRING | IDENTIFIER | "(" expression ")"
     //         | "super" "." IDENTIFIER ;
     /// ```
-    pub fn primary(&mut self) -> Result<Expr> {
+    pub fn primary(&mut self) -> LoxResult<Expr> {
         let token = self.advance();
         let expr = match token.typ.to_owned() {
             TT::False => Expr::Literal {
@@ -681,7 +676,7 @@ impl Parser {
                 Expr::Super { keyword, method }
             }
             unexpected => {
-                return Err(ParseError::new(
+                return Err(LoxError::new(
                     self.peek().to_owned(),
                     format!("Expect expression, found {unexpected:?}"),
                 ));
@@ -690,22 +685,22 @@ impl Parser {
         Ok(expr)
     }
 
-    fn consume(&mut self, tt: &TT, error_msg: impl Into<String>) -> Result<&Token> {
+    fn consume(&mut self, tt: &TT, error_msg: impl Into<String>) -> LoxResult<&Token> {
         if self.check(tt) {
             Ok(self.advance())
         } else {
-            Err(ParseError::new(self.peek().to_owned(), error_msg.into()))
+            Err(LoxError::new(self.peek().to_owned(), error_msg.into()))
         }
     }
 
     // Same as consume function but with match because Identifier require
     // checking for matching but not equality.
-    fn consume_identifier(&mut self, error_msg: impl Into<String>) -> Result<&Token> {
+    fn consume_identifier(&mut self, error_msg: impl Into<String>) -> LoxResult<&Token> {
         let peek = self.peek();
         let ident = match &peek.typ {
             TT::Identifier(..) => self.advance(),
             _ => {
-                return Err(ParseError::new(peek.to_owned(), error_msg));
+                return Err(LoxError::new(peek.to_owned(), error_msg));
             }
         };
 

@@ -3,14 +3,9 @@ use std::collections::HashMap;
 use crate::{
     Token,
     ast::{Expr, FuncDeclaration, Stmt},
+    errors::{LoxError, LoxResult},
     interpreter::Interpreter,
 };
-
-mod error;
-
-pub use error::ResolveError;
-
-type Result<T> = std::result::Result<T, ResolveError>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FunctionType {
@@ -49,7 +44,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub fn resolve_stmts(&mut self, stmts: &[Stmt]) -> Result<()> {
+    pub fn resolve_stmts(&mut self, stmts: &[Stmt]) -> LoxResult<()> {
         for stmt in stmts {
             self.resolve_stmt(stmt)?;
         }
@@ -57,7 +52,7 @@ impl<'a> Resolver<'a> {
         Ok(())
     }
 
-    fn resolve_stmt(&mut self, stmt: &Stmt) -> Result<()> {
+    fn resolve_stmt(&mut self, stmt: &Stmt) -> LoxResult<()> {
         match stmt {
             Stmt::Expression(expr) => self.resolve_expr(expr),
             Stmt::Function(func_declaration) => self.visit_stmt_function(func_declaration),
@@ -94,16 +89,16 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn resolve_return(&mut self, keyword: &Token, value_expr: Option<&Expr>) -> Result<()> {
+    fn resolve_return(&mut self, keyword: &Token, value_expr: Option<&Expr>) -> LoxResult<()> {
         if self.current_function == FunctionType::None {
-            return Err(ResolveError::new(
+            return Err(LoxError::new(
                 keyword.to_owned(),
                 "Can't return from top level code",
             ));
         }
         if let Some(value) = value_expr {
             if self.current_function == FunctionType::Initializer {
-                return Err(ResolveError::new(
+                return Err(LoxError::new(
                     keyword.to_owned(),
                     "Can't return a value fron an initializer.",
                 ));
@@ -118,7 +113,7 @@ impl<'a> Resolver<'a> {
         name: &Token,
         super_class: Option<&Token>,
         methods: &[FuncDeclaration],
-    ) -> Result<()> {
+    ) -> LoxResult<()> {
         let enclusing_class = self.current_class;
         self.current_class = ClassType::Class;
 
@@ -132,7 +127,7 @@ impl<'a> Resolver<'a> {
         if let Some(super_class) = super_class {
             // class Foo < Foo {...}
             if name.lexeme == super_class.lexeme {
-                return Err(ResolveError::new(
+                return Err(LoxError::new(
                     super_class.to_owned(),
                     "A class can't inherit from itself.",
                 ));
@@ -172,7 +167,7 @@ impl<'a> Resolver<'a> {
         Ok(())
     }
 
-    fn visit_stmt_function(&mut self, func_declaration: &FuncDeclaration) -> Result<()> {
+    fn visit_stmt_function(&mut self, func_declaration: &FuncDeclaration) -> LoxResult<()> {
         self.declare(&func_declaration.name)?;
         self.define(&func_declaration.name);
 
@@ -184,7 +179,7 @@ impl<'a> Resolver<'a> {
         &mut self,
         func_declaration: &FuncDeclaration,
         typ: FunctionType,
-    ) -> Result<()> {
+    ) -> LoxResult<()> {
         let enclosing_fun = self.current_function;
         self.current_function = typ;
 
@@ -203,7 +198,7 @@ impl<'a> Resolver<'a> {
         sel.resolve_stmts(&func_declaration.body)
     }
 
-    fn resolve_var(&mut self, name: &Token, initializer: Option<&Expr>) -> Result<()> {
+    fn resolve_var(&mut self, name: &Token, initializer: Option<&Expr>) -> LoxResult<()> {
         // We need to declare and define a variable in two separated steps because of the
         // the case:
         // ```
@@ -222,10 +217,10 @@ impl<'a> Resolver<'a> {
         Ok(())
     }
 
-    fn declare(&mut self, name: &Token) -> Result<()> {
+    fn declare(&mut self, name: &Token) -> LoxResult<()> {
         if let Some(map) = self.scopes.last_mut() {
             if map.insert(name.lexeme.to_owned(), false).is_some() {
-                return Err(ResolveError::new(
+                return Err(LoxError::new(
                     name.to_owned(),
                     "Already a variable with the same name in this scope",
                 ));
@@ -244,7 +239,7 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn resolve_block(&mut self, stmts: &[Stmt]) -> Result<()> {
+    fn resolve_block(&mut self, stmts: &[Stmt]) -> LoxResult<()> {
         self.begin_scope();
         let res = self.resolve_stmts(stmts);
         self.end_scope();
@@ -252,7 +247,7 @@ impl<'a> Resolver<'a> {
         res
     }
 
-    fn resolve_expr(&mut self, expr: &Expr) -> Result<()> {
+    fn resolve_expr(&mut self, expr: &Expr) -> LoxResult<()> {
         match expr {
             Expr::Binary {
                 left,
@@ -298,7 +293,7 @@ impl<'a> Resolver<'a> {
             }
             expr @ Expr::This { keyword } => {
                 if self.current_class == ClassType::None {
-                    return Err(ResolveError::new(
+                    return Err(LoxError::new(
                         keyword.to_owned(),
                         "Can't use 'this' outside of a class.",
                     ));
@@ -309,14 +304,14 @@ impl<'a> Resolver<'a> {
             expr @ Expr::Super { keyword, method: _ } => {
                 match self.current_class {
                     ClassType::None => {
-                        return Err(ResolveError::new(
+                        return Err(LoxError::new(
                             keyword.to_owned(),
                             "Can't use 'super' outside of a class",
                         ));
                     }
                     ClassType::SubClass => {}
                     ClassType::Class => {
-                        return Err(ResolveError::new(
+                        return Err(LoxError::new(
                             keyword.to_owned(),
                             "Can't use 'super' in a class with no superclass",
                         ));
@@ -328,11 +323,11 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    fn expr_var(&mut self, expr: &Expr, name: &Token) -> Result<()> {
+    fn expr_var(&mut self, expr: &Expr, name: &Token) -> LoxResult<()> {
         if let Some(map) = self.scopes.last()
             && map.get(&name.lexeme).is_some_and(|val| !val)
         {
-            return Err(ResolveError::new(
+            return Err(LoxError::new(
                 name.to_owned(),
                 "Can't read local variable in its own initializer.",
             ));
@@ -343,7 +338,7 @@ impl<'a> Resolver<'a> {
         Ok(())
     }
 
-    fn expr_assign(&mut self, assign_expr: &Expr, name: &Token, value: &Expr) -> Result<()> {
+    fn expr_assign(&mut self, assign_expr: &Expr, name: &Token, value: &Expr) -> LoxResult<()> {
         self.resolve_expr(value)?;
         self.resolve_local(assign_expr, name);
         Ok(())

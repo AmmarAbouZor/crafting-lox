@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{RuntimeError, interpreter::instance::LoxInstance};
+use crate::{errors::LoxError, interpreter::instance::LoxInstance};
 
 use super::{Interpreter, LoxValue, callables::LoxClassRef, function::LoxFunction};
 
@@ -43,7 +43,7 @@ impl LoxClass {
         &self,
         interprerter: &mut Interpreter,
         arguments: &[LoxValue],
-    ) -> Result<LoxValue, RuntimeError> {
+    ) -> Result<LoxValue, LoxError> {
         let instance = LoxInstance::new(self.to_owned());
         if let Some(initializer) = self.find_method("init") {
             initializer

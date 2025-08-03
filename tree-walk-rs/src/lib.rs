@@ -13,9 +13,7 @@ mod parser;
 mod resolver;
 mod scanner;
 
-pub use interpreter::{LoxValue, error::RuntimeError};
-pub use parser::error::ParseError;
-pub use resolver::ResolveError;
+pub use interpreter::LoxValue;
 pub use scanner::{Token, TokenType};
 
 pub fn run_file(path: &Path) -> anyhow::Result<()> {
@@ -58,9 +56,7 @@ pub fn run_prompt() -> anyhow::Result<()> {
             Err(RunError::Unrecoverable(err)) => return Err(err),
             // Don't stop on other errors
             Err(err @ RunError::Scan(_)) => eprintln!("Scan Error:\n{err}"),
-            Err(RunError::Parse(err)) => eprintln!("Parse Error:\n{err}"),
-            Err(RunError::Resolve(err)) => eprintln!("Resolve Error:\n{err}"),
-            Err(RunError::Runtime(err)) => eprintln!("Runtime Error:\n{err}"),
+            Err(RunError::LoxError(err)) => eprintln!("Lox Error:\n{err}"),
         }
     }
 }

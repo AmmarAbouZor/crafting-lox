@@ -1,10 +1,11 @@
 use std::{cell::RefCell, fmt::Display, rc::Rc, time::SystemTime};
 
-use crate::{RuntimeError, Token, TokenType};
+use crate::{
+    Token, TokenType,
+    errors::{LoxError, LoxResult},
+};
 
 use super::{Interpreter, LoxValue, class::LoxClass, function::LoxFunction};
-
-type Result<T> = std::result::Result<T, RuntimeError>;
 
 pub type LoxClassRef = Rc<RefCell<LoxClass>>;
 
@@ -20,7 +21,11 @@ pub enum LoxCallable {
 }
 
 impl LoxCallable {
-    pub fn call(&self, interprerter: &mut Interpreter, arguments: &[LoxValue]) -> Result<LoxValue> {
+    pub fn call(
+        &self,
+        interprerter: &mut Interpreter,
+        arguments: &[LoxValue],
+    ) -> LoxResult<LoxValue> {
         match self {
             LoxCallable::Clock => Self::clock(),
             LoxCallable::LoxFunction(func) => func.call(interprerter, arguments),
@@ -36,13 +41,13 @@ impl LoxCallable {
         }
     }
 
-    fn clock() -> Result<LoxValue> {
+    fn clock() -> LoxResult<LoxValue> {
         SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map(|t| t.as_secs())
             .map(|t| LoxValue::Number(t as f64))
             .map_err(|err| {
-                RuntimeError::new(
+                LoxError::new(
                     Token::new(TokenType::Fun, CLOCK_NAME, 0),
                     format!("Error while calling system time: {err}"),
                 )
