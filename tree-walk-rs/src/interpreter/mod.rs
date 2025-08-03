@@ -59,7 +59,6 @@ impl Interpreter {
     }
 
     pub fn resolve(&mut self, expr: &Expr, depth: usize) {
-        //TODO: Check if the same expression can be defined twice and remove this if not.
         if let Some((_exp, dep)) = self.locals.iter_mut().find(|(ex, _dep)| ex == expr) {
             *dep = depth;
         } else {

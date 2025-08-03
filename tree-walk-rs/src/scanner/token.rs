@@ -52,14 +52,6 @@ pub enum TokenType {
     Eof,
 }
 
-impl Display for TokenType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //TODO: Match token types. For now print their debug representation
-        // Or remove the pretty display implementation.
-        write!(f, "{self:?}")
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     // NOTE: ID is needed to identify tokens in the same line
@@ -90,6 +82,6 @@ impl Token {
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.typ, self.lexeme)
+        write!(f, "{}", self.lexeme)
     }
 }

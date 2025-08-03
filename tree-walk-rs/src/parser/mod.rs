@@ -46,8 +46,6 @@ impl Parser {
             self.statement()
         };
 
-        //TODO: Error handling here instead of parse function doesn't feel right.
-        //However, I'll keep it here to stay in synch with the book for now.
         match res {
             Ok(stmt) => Some(stmt),
             Err(err) => {
@@ -293,8 +291,6 @@ impl Parser {
     fn block(&mut self) -> LoxResult<Vec<Stmt>> {
         let mut stmts = Vec::new();
         while !self.check(&TT::RightBrace) && !self.at_end() {
-            // TODO: Error handling doesn't feel correct here.
-            // I need to reconsider when book part is done.
             if let Some(stmt) = self.declaration() {
                 stmts.push(stmt);
             }

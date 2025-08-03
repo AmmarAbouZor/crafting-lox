@@ -21,9 +21,9 @@ pub fn run_file(path: &Path) -> anyhow::Result<()> {
         .with_context(|| format!("Error while reading input file. Path: {}", path.display()))?;
 
     run(file_content).map_err(|err| {
-        // TODO:
+        // NOTE:
         // Anyhow errors must be Send, while the current implementation
-        // misusing errors adding Rc<RefCell<>> to them.
+        // misusing errors adding `Rc<RefCell<>>` to them.
         anyhow::anyhow!("{err:?}")
     })?;
 
@@ -64,13 +64,6 @@ pub fn run_prompt() -> anyhow::Result<()> {
 fn run(content: String) -> Result<(), RunError> {
     let scanner = Scanner::new(content);
     let scan_res = scanner.scan_tokens();
-
-    //TODO: Clean up
-    // println!("Tokens:");
-    // for token in &scan_res.tokens {
-    //     println!("  {token}");
-    // }
-    // println!("-------------------------------------------");
 
     let errors_count = scan_res.errors.len();
 

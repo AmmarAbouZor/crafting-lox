@@ -11,8 +11,6 @@ pub type LoxClassRef = Rc<RefCell<LoxClass>>;
 
 pub const CLOCK_NAME: &str = "clock";
 
-// TODO: Implementing all the traits isn't necessary if we want to move
-// out from LoxValue
 #[derive(Debug, Clone, PartialEq)]
 pub enum LoxCallable {
     Clock,
