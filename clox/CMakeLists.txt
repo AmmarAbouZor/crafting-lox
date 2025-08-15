@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.10)
 
 project(Clox C)
 
-add_executable(clox src/main.c)
+add_executable(clox 
+  src/main.c
+  src/chunk.c
+  src/memory.c
+)
 
 target_include_directories(clox PUBLIC include)
