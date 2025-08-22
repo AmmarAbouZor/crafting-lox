@@ -12,6 +12,7 @@ add_executable(clox
   src/compiler.c
   src/scanner.c
   src/object.c
+  src/table.c
 )
 
 target_include_directories(clox PUBLIC include)
