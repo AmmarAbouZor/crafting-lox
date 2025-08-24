@@ -1,0 +1,21 @@
+print "Start: X is greater...";
+
+var x = 11;
+
+if (x > 10) { 
+  print "X is greater than 10"; 
+} else { 
+  print "X is less than 10";
+}
+
+print "Changing X to less...";
+
+x = 9;
+
+if (x > 10) { 
+  print "X is greater than 10"; 
+} else { 
+  print "X is less than 10";
+}
+
+print "Done ...";
