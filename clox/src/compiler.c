@@ -294,7 +294,7 @@ static void and_(bool canAssign) {
   // Taken from the book for clarity:
   // At the point and is called, the left-hand side expression has already been
   // compiled. That means at runtime, its value will be on top of the stack. If
-  // that value is falsey, then we know the entire and must be false, so we skip
+  // that value is falsy, then we know the entire and must be false, so we skip
   // the right operand and leave the left-hand side value as the result of the
   // entire expression. Otherwise, we discard the left-hand value and evaluate
   // the right operand which becomes the result of the whole and expression.
@@ -338,6 +338,58 @@ static void expressionStatement() {
   expression();
   consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
   emitByte(OP_POP);
+}
+
+static void forStatement() {
+  beginScope();
+
+  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+  // *** Initializer clause ***
+  if (match(TOKEN_SEMICOLON)) {
+    // No initializer.
+  } else if (match(TOKEN_VAR)) {
+    varDeclaration();
+  } else {
+    // Expression statement because we want to pop the value from the stack and
+    // we want to handle the semicolon as well.
+    expressionStatement();
+  }
+
+  int loopStart = currentChunk()->count;
+
+  // *** Condition clause ***
+  int exitJump = -1;
+  if (!match(TOKEN_SEMICOLON)) {
+    expression();
+    consume(TOKEN_SEMICOLON, "Expect ';' after loop condition.");
+
+    // Jump out of the loop if the condition is false.
+    exitJump = emitJump(OP_JUMP_IF_FALSE);
+    emitJump(OP_POP); // Condition
+  }
+
+  // *** Increment Clause ***
+  if (!match(TOKEN_RIGHT_PAREN)) {
+    int bodyJump = emitJump(OP_JUMP);
+    int incrementStart = currentChunk()->count;
+    expression();
+    emitByte(OP_POP);
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
+
+    emitLoop(loopStart);
+    loopStart = incrementStart;
+    patchJump(bodyJump);
+  }
+
+  statement();
+  emitLoop(loopStart);
+
+  if (exitJump != -1) {
+    patchJump(exitJump);
+    emitByte(OP_POP); // Condition
+  }
+
+  endScope();
 }
 
 static void ifStatement() {
@@ -435,6 +487,8 @@ static void declaration() {
 static void statement() {
   if (match(TOKEN_PRINT)) {
     printStatement();
+  } else if (match(TOKEN_FOR)) {
+    forStatement();
   } else if (match(TOKEN_IF)) {
     ifStatement();
   } else if (match(TOKEN_WHILE)) {
