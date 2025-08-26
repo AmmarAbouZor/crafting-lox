@@ -1,0 +1,18 @@
+fun outer() {
+  var a = 1;
+  var b = 2;
+  fun middle() {
+    var c = 3;
+    var d = 4;
+    fun inner() {
+      print a + c + b + d;
+    }
+  }
+}
+
+// The Debug Output:
+// 0004    9 OP_CLOSURE          2 <fn inner>
+// 0006      |                     upvalue 0
+// 0008      |                     local 1
+// 0010      |                     upvalue 1
+// 0012      |                     local 2
