@@ -2,6 +2,7 @@
 
 #include "chunk.h"
 #include "memory.h"
+#include "vm.h"
 
 void initChunk(Chunk *chunk) {
   chunk->count = 0;
@@ -37,7 +38,10 @@ void freeChunk(Chunk *chunk) {
 }
 
 int addConstant(Chunk *chunk, Value value) {
+  // Push and pop to consider garbage collector.
+  push(value);
   writeValueArray(&chunk->constants, value);
+  pop();
 
   return chunk->constants.count - 1;
 }
