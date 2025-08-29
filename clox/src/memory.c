@@ -10,7 +10,7 @@
 #include <stdio.h>
 #endif
 
-#define GC_HEAP_GROW_FACTOR 2;
+#define GC_HEAP_GROW_FACTOR 2
 
 /**
  * Function for all memory operations (Allocate, Free, Extend , Shrink)
@@ -128,7 +128,7 @@ static void blackenObject(Obj *object) {
   case OBJ_NATIVE:
   case OBJ_STRING:
     break;
-  };
+  }
 }
 
 static void freeObject(Obj *object) {

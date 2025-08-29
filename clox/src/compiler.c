@@ -5,7 +5,6 @@
 #include "common.h"
 #include "compiler.h"
 #include "memory.h"
-#include "object.h"
 #include "scanner.h"
 
 #ifdef DEBUG_PRINT_CODE
@@ -289,7 +288,7 @@ static bool identifiersEqual(Token *a, Token *b) {
 }
 
 static int resolveLocal(Compiler *compiler, Token *name) {
-  for (int i = compiler->localCount - 1; i >= 0; i++) {
+  for (int i = compiler->localCount - 1; i >= 0; i--) {
     Local *local = &compiler->locals[i];
     if (identifiersEqual(name, &local->name)) {
       if (local->depth == -1) {
@@ -367,7 +366,7 @@ static void declareVariable() {
     }
 
     if (identifiersEqual(name, &local->name)) {
-      error("Already a variable with this name in scope.");
+      error("Already a variable with this name in this scope.");
     }
   }
 
@@ -407,7 +406,7 @@ static uint8_t argumentList() {
     do {
       expression();
 
-      if (argCount > 255) {
+      if (argCount == 255) {
         error("Can't have more than 255 arguments.");
       }
 
@@ -490,7 +489,7 @@ static void super_(bool canAssign) {
   if (currentClass == NULL) {
     error("Can't use 'super' outside of a class.");
   } else if (!currentClass->hasSuperclass) {
-    error("Can't use 'super' in a class with no superlass.");
+    error("Can't use 'super' in a class with no superclass.");
   }
 
   consume(TOKEN_DOT, "Expect '.' after 'super'.");
@@ -585,14 +584,14 @@ static void classDeclaration() {
       error("A class can't inherit from itself.");
     }
 
+    beginScope();
+    addLocal(syntheticToken("super"));
+    defineVariable(0);
+
     namedVariable(className, false);
     emitByte(OP_INHERIT);
     classCompiler.hasSuperclass = true;
   }
-
-  beginScope();
-  addLocal(syntheticToken("super"));
-  defineVariable(0);
 
   namedVariable(className, false);
   consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
@@ -661,7 +660,7 @@ static void forStatement() {
 
     // Jump out of the loop if the condition is false.
     exitJump = emitJump(OP_JUMP_IF_FALSE);
-    emitJump(OP_POP); // Condition
+    emitByte(OP_POP); // Condition
   }
 
   // *** Increment Clause ***
@@ -934,7 +933,7 @@ static void dot(bool canAssign) {
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     emitBytes(OP_SET_PROPERTY, name);
-  } else if (TOKEN_LEFT_PAREN) {
+  } else if (match(TOKEN_LEFT_PAREN)) {
     uint8_t argCount = argumentList();
     emitBytes(OP_INVOKE, name);
     emitByte(argCount);
@@ -1057,6 +1056,6 @@ void markCompilerRoots() {
   Compiler *compiler = current;
   while (compiler != NULL) {
     markObject((Obj *)compiler->function);
-    compiler = current->enclosing;
+    compiler = compiler->enclosing;
   }
 }

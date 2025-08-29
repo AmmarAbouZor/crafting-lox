@@ -76,7 +76,7 @@ static void adjustCapacity(Table *table, int capacity) {
     if (entry->key == NULL)
       continue;
 
-    Entry *dest = findEntry(entries, capacity, entries->key);
+    Entry *dest = findEntry(entries, capacity, entry->key);
     dest->key = entry->key;
     dest->value = entry->value;
     table->count++;
@@ -96,17 +96,17 @@ bool tableSet(Table *table, ObjString *key, Value value) {
 
   Entry *entry = findEntry(table->entries, table->capacity, key);
 
-  bool isNeyKey = entry->key == NULL;
+  bool isNewKey = entry->key == NULL;
 
   // Increase count on empty buckets because the tombstones are already counted
   // when they were filled.
-  if (isNeyKey && IS_NIL(entry->value))
+  if (isNewKey && IS_NIL(entry->value))
     table->count++;
 
   entry->key = key;
   entry->value = value;
 
-  return isNeyKey;
+  return isNewKey;
 }
 
 bool tableDelete(Table *table, ObjString *key) {

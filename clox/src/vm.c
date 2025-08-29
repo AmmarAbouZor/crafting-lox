@@ -73,7 +73,7 @@ void initVM() {
   // We need to zero the field at first to avoid unpredicted behavior if GC runs
   // inside the copyString() call
   vm.initString = NULL;
-  vm.initString = copyString("this", 4);
+  vm.initString = copyString("init", 4);
 
   defineNative("clock", clockNative);
 }
@@ -414,7 +414,7 @@ static InterpretResult run() {
     case OP_EQUAL: {
       Value b = pop();
       Value a = pop();
-      push(BOOL_VAL(valueEqual(a, b)));
+      push(BOOL_VAL(valuesEqual(a, b)));
       break;
     }
     case OP_GREATER:

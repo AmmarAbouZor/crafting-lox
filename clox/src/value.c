@@ -57,7 +57,7 @@ void printValue(Value value) {
 #endif
 }
 
-bool valueEqual(Value a, Value b) {
+bool valuesEqual(Value a, Value b) {
 #ifdef NAN_BOXING
   if (IS_NUMBER(a) && IS_NUMBER(b)) {
     return AS_NUMBER(a) == AS_NUMBER(b);
